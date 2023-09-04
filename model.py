@@ -62,25 +62,6 @@ def get_cycle_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     else: 
         raise NameError(f'Dataset {ds} unknown.')
 
-class Transfer0_0(Module):
-    def __init__(self, hidden_channels: int, reduce: str = 'sum') -> None:
-        super().__init__()
-        self.reduce = reduce
-        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.lin2 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.bn = BatchNorm1d(hidden_channels)
-        self.mlp = get_mlp(hidden_channels,0)
-    def forward(self, source_rep: Tensor, target_rep: Tensor, data: TransferData0):
-        lin1 = self.lin1
-        lin2 = self.lin2
-        bn = self.bn
-        def message_encoder(source: Tensor, target: Tensor) -> Tensor:
-            nonlocal lin1
-            nonlocal lin2
-            nonlocal bn
-            return bn(lin1(source) + lin2(target)).relu()
-        return transfer0_0(source_rep,data,message_encoder,target_rep,self.reduce)
-
 class ConvZero(Module):
     def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
         super().__init__()
