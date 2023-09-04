@@ -50,7 +50,7 @@ class PreprocessTransform(BaseTransform):
             edge_attr_cycle_edge = lens.repeat_interleave(lens2)
             edge_attr_cycle = lens
             
-            edge_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(lens2) # needed for mapping cycles to cycle-edge pairs.
+            edge_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(lens) # needed for mapping cycles to cycle-edge pairs.
 
             data.edge_index_edge = edge_index_edge
             data.edge_index_edge_cycle = edge_index_edge_cycle
