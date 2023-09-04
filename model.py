@@ -28,23 +28,6 @@ def get_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: O
         layers.append(Dropout(dropout))
     return Sequential(*layers)
 
-class Representation(NamedTuple):
-    node_rep: Tensor
-    edge_rep: Tensor
-    cycle_rep: Tensor
-    
-    edge_attr: Tensor
-    cycle_attr: Tensor
-    cycle_edge_attr: Tensor
-
-    edge_index_node: Tensor
-    edge_index_edge: Tensor
-    edge_index_node_edge: Tensor
-    edge_index_edge_cycle: Tensor
-
-    cycle_edge_cycle_indicator: Tensor
-
-
 def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
         return Embedding(4,hidden_dim)
@@ -150,28 +133,17 @@ class Net(Module):
         )
     def forward(self, data: MultiScaleData) -> Tensor:
         # initializing model
-        rep = Representation(
-            self.atom_encoder(data.x),
-            self.edge_encoder(data.edge_attr),
-            self.cycle_encoder(data.edge_attr_cycle),
-            data.edge_attr,
-            data.edge_attr_cycle,
-            data.edge_attr_cycle_edge,
-            data.edge_index,
-            data.edge_index_edge,
-            data.edge_index_node_edge,
-            data.edge_index_edge_cycle,
-            data.cycle_edge_cycle_indicator,
-        )
+        node_rep = self.atom_encoder(data.x)
+        edge_rep = self.edge_encoder(data.edge_attr)
+        cycle_rep = self.cycle_encoder(data.edge_attr_cycle)
 
         # performing message passing
         for layer in self.layers:
-            rep = layer(rep)
+            node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,data)
         
         # finalizing model
-        nodes, edges, cycles = rep.node_rep, rep.edge_rep, rep.cycle_rep
-        nodes = global_mean_pool(nodes,data.batch,size=data.num_graphs)
-        edges = global_mean_pool(edges,data.edge_batch,size=data.num_graphs)
-        cycles = global_mean_pool(cycles,data.cycle_batch,size=data.num_graphs)
+        nodes = global_mean_pool(node_rep,data.batch,size=data.num_graphs)
+        edges = global_mean_pool(edge_rep,data.edge_batch,size=data.num_graphs)
+        cycles = global_mean_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
 
         return self.final_mlp(torch.cat([nodes,edges,cycles],-1))
