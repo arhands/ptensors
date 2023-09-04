@@ -34,6 +34,7 @@ def check_trainable_grads(module: Module, ntabs: int = 0):
     for c in module.children():
         check_trainable_grads(c,ntabs+1)
 def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoader, device: str, best_val_path: str = 'best_val.ckpt', num_epochs: int = 400, lr: float = 0.01, patience: int = 40):
+    print("trainable num params:",sum(p.numel() for p in model.parameters() if p.requires_grad))
     loss_fn = L1Loss()
     optim = torch.optim.Adam(model.parameters(),lr)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,'min',0.5,patience=patience)
