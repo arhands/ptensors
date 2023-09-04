@@ -52,8 +52,8 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
             loss.backward()
-            check_trainable_grads(model)
-            raise NameError("?")
+            # check_trainable_grads(model)
+            # raise NameError("?")
             optim.step()
 
             loss_float : float = loss.detach().item()
