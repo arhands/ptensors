@@ -79,7 +79,7 @@ class ConvZero(Module):
             self.edge_encoder(edge_attr) + 
             self.lin3(edge_rep))
         messages = self.bn(messages).relu()
-        y = scatter(messages,edge_index[1],0,reduce=self.reduce)
+        y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=node_rep.size(0))
         return self.mlp(y)
 
 class RaiseZero(Module):
@@ -97,7 +97,7 @@ class RaiseZero(Module):
             self.lin1(node_rep)[edge_index[0]] + 
             (edge_rep * (1 + self.epsilon))[edge_index[1]])
         messages = self.mlp1(messages)
-        y = scatter(messages,edge_index[1],0,reduce=self.reduce)
+        y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=edge_rep.size(0))
         return self.mlp1(y)
 
 class ModelLayer(Module):
