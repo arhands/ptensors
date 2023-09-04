@@ -99,7 +99,7 @@ class RaiseZero(Module):
             (edge_rep * (1 + self.epsilon))[edge_index[1]])
         messages = self.mlp1(messages)
         y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=edge_rep.size(0))
-        return self.mlp1(y)
+        return self.mlp2(y)
 
 class ModelLayer(Module):
     def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC']) -> None:
