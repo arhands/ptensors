@@ -152,7 +152,7 @@ class Net(Module):
         self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers))
         # finalization layers
         self.final_mlp = Sequential(
-            Linear(hidden_dim,2*hidden_dim),
+            Linear(hidden_dim*3,2*hidden_dim),
             # Linear(3*hidden_dim,2*hidden_dim,False),
             BatchNorm1d(2*hidden_dim),
             ReLU(True),
