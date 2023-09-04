@@ -140,7 +140,8 @@ class ModelLayer(Module):
             rep.edge_index_node,
             rep.edge_index_edge,
             rep.edge_index_node_edge,
-            rep.edge_index_edge_cycle
+            rep.edge_index_edge_cycle,
+            rep.cycle_edge_cycle_indicator,
         )
 
 
