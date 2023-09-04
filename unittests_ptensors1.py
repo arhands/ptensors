@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import torch
-from objects import TransferData1, atomspack
+from objects import TransferData1, atomspack1
 from ptensors1 import transfer0_1, transfer1_0, transfer1_1, linmaps0_1, linmaps1_0, linmaps1_1
 
 class transfer0_1_test(TestCase):
@@ -9,8 +9,8 @@ class transfer0_1_test(TestCase):
         a = [[0,1,2]]
         b = [[2,3,4],[1,2,3],[3,4,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([1]).unsqueeze(-1)
@@ -26,8 +26,8 @@ class transfer0_1_test(TestCase):
         a = [[0,1,2],[2,3,4]]
         b = [[1,2,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([1,10]).unsqueeze(-1)
@@ -56,8 +56,8 @@ class transfer1_0_test(TestCase):
         a = [[0,1,2]]
         b = [[2,3,4],[1,2,3],[3,4,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([1,10,100]).unsqueeze(-1)
@@ -74,8 +74,8 @@ class transfer1_0_test(TestCase):
         a = [[0,1,2],[2,3,4]]
         b = [[1,2,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([
@@ -97,8 +97,8 @@ class transfer1_1_test(TestCase):
         a = [[0,1,2]]
         b = [[2,3,4],[1,2,3],[3,4,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([1,10,100]).unsqueeze(-1)
@@ -126,8 +126,8 @@ class transfer1_1_test(TestCase):
         a = [[0,1,2],[2,3,4]]
         b = [[1,2,5]]
         
-        a = atomspack.from_list(a)
-        b = atomspack.from_list(b)
+        a = atomspack1.from_list(a)
+        b = atomspack1.from_list(b)
         transfer_map = TransferData1.from_atomspacks(a,b)
         
         x = torch.tensor([
@@ -178,7 +178,7 @@ class linmaps(TestCase):
     def test_linmaps0_1(self):
         a = [[2,3,4],[1,2,3]]
         
-        a = atomspack.from_list(a)
+        a = atomspack1.from_list(a)
         
         x = torch.tensor([1,10]).unsqueeze(-1)
 
@@ -191,7 +191,7 @@ class linmaps(TestCase):
     def test_linmaps1_0(self):
         a = [[2,3,4],[1,2,3,7]]
         
-        a = atomspack.from_list(a)
+        a = atomspack1.from_list(a)
         
         x = torch.tensor([
             1,2,4,
@@ -218,7 +218,7 @@ class linmaps(TestCase):
     def test_linmaps1_1(self):
         a = [[2,3],[1,2,5]]
         
-        a = atomspack.from_list(a)
+        a = atomspack1.from_list(a)
         
         x = torch.tensor([
             1,2,

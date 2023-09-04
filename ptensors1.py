@@ -4,15 +4,15 @@ import torch
 from torch import Tensor
 from torch_scatter import scatter
 from torch_geometric.data import Data
-from objects import TransferData1, atomspack, atomspack2
+from objects import TransferData1, atomspack1, atomspack2
 
-def linmaps0_1(x: Tensor, domains:  atomspack):
+def linmaps0_1(x: Tensor, domains:  atomspack1):
     return x[domains.domain_indicator]
 
-def linmaps1_0(x: Tensor, domains: atomspack, reduce: str='sum'):
+def linmaps1_0(x: Tensor, domains: atomspack1, reduce: str='sum'):
     return scatter(x,domains.domain_indicator,0,reduce=reduce)
 
-def linmaps1_1(x: Tensor, domains: atomspack, reduce: str='sum'):
+def linmaps1_1(x: Tensor, domains: atomspack1, reduce: str='sum'):
     return torch.cat([
         x,
         linmaps0_1(linmaps1_0(x,domains,reduce),domains),
@@ -26,11 +26,11 @@ def transfer0_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
     """
     if isinstance(reduce,str):
         reduce = [reduce]*2
-    domain_reduced = scatter(x[data.source.domain_indicator],data.source.atoms,0,dim_size=data.num_nodes,reduce=reduce[0])
+    node_reduced = scatter(x[data.source.domain_indicator],data.source.atoms,0,dim_size=data.num_nodes,reduce=reduce[0])
 
-    target_broadcasted = domain_reduced[data.target.atoms]
+    target_broadcasted = node_reduced[data.target.atoms]
 
-    intersection_broadcasted = scatter(x[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.num_targets,reduce=reduce[1])[data.target.domain_indicator]
+    intersection_broadcasted = scatter(x[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])[data.target.domain_indicator]
     return torch.cat([
         target_broadcasted,
         intersection_broadcasted,
@@ -43,10 +43,10 @@ def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
     
     domain_reduced = scatter(x,data.source.domain_indicator,0,reduce=reduce[0])
 
-    domain_maps = scatter(domain_reduced[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.num_targets,reduce=reduce[1])
+    domain_maps = scatter(domain_reduced[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])
 
     node_maps = scatter(x[data.node_map_edge_index[0]],data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[2])
-    node_maps = scatter(node_maps,data.target.domain_indicator,0,dim_size=data.num_targets,reduce=reduce[3])
+    node_maps = scatter(node_maps,data.target.domain_indicator,0,dim_size=data.target.num_domains,reduce=reduce[3])
     return torch.cat([
         node_maps,
         domain_maps,

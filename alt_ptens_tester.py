@@ -52,16 +52,16 @@ for i in range(len(neighbors_list)):
 induced_cycles = get_induced_cycles(neighbors)
 induced_cycles = [v.to_list() for v in induced_cycles]
 
-from objects import atomspack, TransferData1
+from objects import atomspack1, TransferData1
 from ptensors1 import linmaps0_1, linmaps1_0, linmaps1_1, transfer0_1, transfer1_0, transfer1_1
 import torch
 
-cycle_pack = atomspack.from_list(induced_cycles)
+cycle_pack = atomspack1.from_list(induced_cycles)
 
 edges = []
 for idx, N in enumerate(neighbors_list):
     edges.extend([[idx,j] for j in N])
-edge_pack = atomspack.from_list(edges)
+edge_pack = atomspack1.from_list(edges)
 
 transfer_data = TransferData1.from_atomspacks(cycle_pack,edge_pack)
 

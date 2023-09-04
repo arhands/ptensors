@@ -1,51 +1,80 @@
-from typing import Any, List, Union, Tuple, overload
+from typing import Any, Iterable, List, Union, Tuple, overload
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.data import Batch, Data
 from induced_cycle_finder import from_edge_index, get_induced_cycles
 import torch
 from torch import Tensor
-import ptens as p
-from utils import GraphMapCache
+from objects import TransferData1, MultiScaleData, atomspack1
+from induced_cycle_finder import get_induced_cycles, from_edge_index
 
-class ProcessedData(Data):
-    
-class OnMoveToDeviceTransform(BaseTransform):
-    def __init__(self, patterns: List[str], target_device: str, force_clone: bool = False) -> None:
-        super().__init__()
-        self.force_clone = force_clone
-        self.target_device = target_device
-
+class PreprocessTransform(BaseTransform):
+    def __call__(self, data_: Data) -> MultiScaleData:
+        data = MultiScaleData()
+        data.__dict__.update(data_.__dict__)
         
-    @overload
-    def __call__(self, data: Batch) -> Tuple[Batch,GraphMapCache]:...
-    @overload
-    def __call__(self, data: Data) -> Tuple[Data,GraphMapCache]:...
-    
-    def __call__(self, data: Union[Batch,Data]) -> Tuple[Union[Batch,Data],GraphMapCache]:
-        if self.force_clone:
-            data = data.clone()
+        data.x = data.x.flatten()
+        data.edge_attr = data.edge_attr.flatten()
 
-        num_nodes = data.num_nodes
-        edge_index = data.edge_index
-        induced_cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
-        induced_cycles = [v.to_list() for v in induced_cycles]
-
-        G = p.graph.from_edge_index(data.edge_index.float(),data.num_nodes)
-        map_cache = GraphMapCache(G,{'E' : G.edges(), 'cycles' : induced_cycles})
-        return data.cuda(), map_cache
-
-
-# class AddThreeSkeleton(BaseTransform):
-#     def __call__(self, data: Union[Batch,Data]) -> Union[Batch,Data]:
-#         num_nodes = data.num_nodes
-#         edge_index = data.edge_index
-#         induced_cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
-#         induced_cycles = [torch.tensor(v.to_list()) for v in induced_cycles]
+        edge_index : Tensor = data.edge_index
+        num_nodes : int = data.num_nodes
+        cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
+        # nodes = atomspack1(torch.arange(num_nodes),torch.arange(num_nodes),num_nodes)
+        edges = atomspack1(edge_index.transpose(1,0).flatten(),torch.arange(edge_index.size(1)).repeat_interleave(2),edge_index.size(1))
         
-#         vertex_indicator = torch.cat([torch.tensor(v) for v in induced_cycles])
-#         cycle_indicator = torch.cat([torch.tensor(idx).broadcast_to(len(v)) for idx, v in enumerate(induced_cycles)])
-#         to_cycle_edge_index = torch.stack([
-#             torch.cat([torch.tensor(idx).broadcast_to(len(v)) for idx, v in enumerate(induced_cycles)]),
-#             torch.cat([torch.tensor(v) for v in induced_cycles])
-#         ])
-#         return super().__call__(data)
+        edge_index_node_edge = torch.stack([edge_index[0],torch.arange(edges.num_domains)],0)
+        data.edge_index_node_edge = edge_index_node_edge
+        
+        if len(cycles) > 0:
+
+            
+            cycles = [c.to_list() for c in cycles]
+            cycles_ap = atomspack1.from_list(cycles)
+
+            
+            edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap)
+            edge_index_edge_cycle = edges_to_cycles.domain_map_edge_index
+            cycle_cliques = []
+            lens = torch.tensor([len(c) for c in cycles])
+            cycles = [torch.tensor(c) for c in cycles]
+            for c in cycles:
+                cycle_cliques.append(torch.stack([
+                    c.repeat(len(c)),
+                    torch.repeat_interleave(c,len(c))
+                ]))
+            edge_index_edge = torch.cat(cycle_cliques,-1)
+            lens2 = lens**2
+
+
+            # computing indicator for cycle size
+            # TODO: figure out better features for cycles.
+            edge_attr_cycle_edge = lens.repeat_interleave(lens2)
+            edge_attr_cycle = lens
+            
+            edge_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(lens2) # needed for mapping cycles to cycle-edge pairs.
+
+            data.edge_index_edge = edge_index_edge
+            data.edge_index_edge_cycle = edge_index_edge_cycle
+
+            data.edge_attr_cycle_edge = edge_attr_cycle_edge
+            data.edge_attr_cycle = edge_attr_cycle
+            
+            data.cycle_edge_cycle_indicator = edge_cycle_indicator
+
+            data.edge_batch = torch.zeros(edges.num_domains)
+            data.cycle_batch = torch.zeros(len(cycles))
+            data.num_cycles = len(cycles)
+        else:
+            
+            data.edge_index_edge = torch.empty(2,0,dtype=torch.int64)
+            data.edge_index_edge_cycle = torch.empty(2,0,dtype=torch.int64)
+
+            data.edge_attr_cycle_edge = torch.empty(0,dtype=torch.int64)
+            data.edge_attr_cycle = torch.empty(0,dtype=torch.int64)
+            
+            data.cycle_edge_cycle_indicator = torch.empty(0,dtype=torch.int64)
+
+            data.edge_batch = torch.zeros(edges.num_domains)
+            data.cycle_batch = torch.zeros(0)
+            data.num_cycles = 0
+
+        return data

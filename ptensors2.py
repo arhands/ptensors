@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from torch_scatter import scatter
 from torch_geometric.data import Data
-from objects import TransferData1, atomspack, atomspack2
+from objects import TransferData1, atomspack1, atomspack2
 from ptensors1 import linmaps1_0, linmaps0_1, transfer0_1
 
 def linmaps0_2(x: Tensor, domains: atomspack2):

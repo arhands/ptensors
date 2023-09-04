@@ -2,13 +2,14 @@ from __future__ import annotations
 import torch
 from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, ModuleList
 from torch import Tensor
-from typing import Union, Optional, Tuple
-import ptens as p
+from typing import Literal, NamedTuple, Union, Optional, Tuple
 from torch_geometric.data import Data
 from torch_geometric.nn import global_mean_pool
-from utils import ptensors_layer_type, domain_list_type, GraphMapCache, _scalar_mult, _sum
+from ptensors0 import TransferData0, transfer0_0
+from torch_scatter import scatter
+from objects import MultiScaleData
 
-def get_torch_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None):
+def get_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None):
     assert 0 <= dropout < 1, 'Dropout must fall in the interval [0,1).'
     if out_channels is None:
         out_channels = in_channels
@@ -26,139 +27,146 @@ def get_torch_mlp(in_channels: int, dropout: float, bias: bool = True, out_chann
     if dropout > 0:
         layers.append(Dropout(dropout))
     return Sequential(*layers)
-class MLP(Module):
-    def __init__(self, in_channels: int, dropout: float, bias: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None) -> None:
-        super().__init__()
-        self.mlp = get_torch_mlp(in_channels, dropout, bias, out_channels, hidden_channels)
-    def forward(self, x: ptensors_layer_type) -> ptensors_layer_type:
-        res = self.mlp(x.torch())
-        atoms = x.get_atoms()
-        if isinstance(x,p.ptensors0):
-            return p.ptensors0.from_matrix(res,atoms)
-        elif isinstance(x,p.ptensors1):
-            return p.ptensors1.from_matrix(res,atoms)
-        return p.ptensors1.from_matrix(res,atoms)
 
-class AtomEncoder(Module):
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        self.emb = Embedding(22,hidden_dim)
-    def forward(self, x: Tensor) -> p.ptensors0:
-        x = self.emb(x.flatten())
-        x = p.ptensors0.from_matrix(x)
-        return x
-
-class EdgeEncoder(Module):
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        self.emb = Embedding(4,hidden_dim)
+class Representation(NamedTuple):
+    node_rep: Tensor
+    edge_rep: Tensor
+    cycle_rep: Tensor
     
-    def forward(self, edge_attr: Tensor, edges: domain_list_type) -> p.ptensors0:
-        return p.ptensors0.from_matrix(self.emb(edge_attr),edges)
+    edge_attr: Tensor
+    cycle_edge_attr: Tensor
 
-class GINE(Module):
-    def __init__(self, hidden_dim: int, dropout: float) -> None:
+    edge_index_node: Tensor
+    edge_index_edge: Tensor
+    edge_index_node_edge: Tensor
+    edge_index_edge_cycle: Tensor
+
+    cycle_edge_cycle_indicator: Tensor
+
+
+def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
+    if ds == 'ZINC':
+        return Embedding(4,hidden_dim)
+    else: 
+        raise NameError(f'Dataset {ds} unknown.')
+
+def get_node_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
+    if ds == 'ZINC':
+        return Embedding(22,hidden_dim)
+    else: 
+        raise NameError(f'Dataset {ds} unknown.')
+
+def get_cycle_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
+    if ds == 'ZINC':
+        return Embedding(19,hidden_dim)
+    else: 
+        raise NameError(f'Dataset {ds} unknown.')
+
+class Transfer0_0(Module):
+    def __init__(self, hidden_channels: int, reduce: str = 'sum') -> None:
         super().__init__()
-        self.nn = MLP(hidden_dim,dropout)
-        self.edge_encoder = EdgeEncoder(hidden_dim)
-        self.eps = Parameter(torch.tensor(0.),requires_grad=True)
-    
-    def forward(self, x: p.ptensors0, to_edges: p.graph, from_edges: p.graph, edge_attr: Tensor, edges: Tensor) -> p.ptensors0:
-        x_edges : p.ptensors0 = x.gather(to_edges)
-        x_edges = (x_edges + self.edge_encoder(edge_attr,edges)).relu(0.)
+        self.reduce = reduce
+        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.lin2 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.bn = BatchNorm1d(hidden_channels)
+        self.mlp = get_mlp(hidden_channels,0)
+    def forward(self, source_rep: Tensor, target_rep: Tensor, data: TransferData0):
+        lin1 = self.lin1
+        lin2 = self.lin2
+        bn = self.bn
+        def message_encoder(source: Tensor, target: Tensor) -> Tensor:
+            nonlocal lin1
+            nonlocal lin2
+            nonlocal bn
+            return bn(lin1(source) + lin2(target)).relu()
+        return transfer0_0(source_rep,data,message_encoder,target_rep,self.reduce)
 
-        x = _scalar_mult(x,self.eps + 1) + x_edges.gather(from_edges)
-
-        x = self.nn(x)
-        
-        return x
-
-class GIN_P1(Module):
-    def __init__(self, hidden_dim: int, dropout: float) -> None:
+class ConvZero(Module):
+    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
         super().__init__()
-        self.nn = get_torch_mlp(2*hidden_dim,out_channels=hidden_dim,dropout=dropout)
-        self.lin = torch.nn.Linear(hidden_dim,2*hidden_dim)
-        self.eps = Parameter(torch.tensor(0.),requires_grad=True)
-    
-    def forward(self, x: p.ptensors1, G: p.graph) -> p.ptensors0:
-        atoms = x.get_atoms()
-        x_transfer = x.transfer1(atoms,G)
-        x_linmaps = x.linmaps1()
-        
-        x = torch.stack([
-            self.lin(x.torch()),
-            (1 + self.eps) * x_linmaps.torch(),
-            x_transfer.torch(),
-        ]).sum(0)
+        self.reduce = reduce
+        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.lin2 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.lin3 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.bn = BatchNorm1d(hidden_channels)
+        self.mlp = get_mlp(hidden_channels,0)
+        self.edge_encoder = edge_encoder
+    def forward(self, node_rep: Tensor, edge_rep: Tensor, edge_attr: Tensor, edge_index: Tensor):
+        messages = (
+            self.lin1(node_rep)[edge_index[0]] + 
+            self.lin2(node_rep)[edge_index[1]] + 
+            self.edge_encoder(edge_attr) + 
+            self.lin3(edge_rep))
+        messages = self.bn(messages).relu()
+        y = scatter(messages,edge_index[1],0,reduce=self.reduce)
+        return self.mlp(y)
 
-        x = self.nn(x)
-        
-        return p.ptensors1.from_matrix(x,atoms)
+class RaiseZero(Module):
+    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
+        super().__init__()
+        self.reduce = reduce
+        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
+        self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
+        self.mlp1 = get_mlp(hidden_channels,0)
+        self.mlp2 = get_mlp(hidden_channels,0)
+        self.edge_encoder = edge_encoder
+    def forward(self, edge_rep: Tensor, node_rep: Tensor, edge_index: Tensor):
+        # edge_index: map from nodes to edges.
+        messages = (
+            self.lin1(node_rep)[edge_index[0]] + 
+            (edge_rep * (1 + self.epsilon))[edge_index[1]])
+        messages = self.mlp1(messages)
+        y = scatter(messages,edge_index[1],0,reduce=self.reduce)
+        return self.mlp1(y)
 
 class ModelLayer(Module):
-    def __init__(self, hidden_channels: int, dropout: float, residual: bool) -> None:
+    def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC']) -> None:
         super().__init__()
-        self.gnn_P0 = GINE(hidden_channels,dropout)
-        self.mlp_cycle_5_to_P0 = MLP(hidden_channels,dropout)
-        self.mlp_cycle_6_to_P0 = MLP(hidden_channels,dropout)
+        # self.node_gnn = GINEConv(get_mlp(hidden_channels,dropout),train_eps=True)
+        self.node_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset))
+        self.edge_gnn = ConvZero(hidden_channels,get_edge_encoder(hidden_channels,dataset))
+        self.node_edge_gnn = RaiseZero(hidden_channels,dataset)
+        self.edge_cycle_gnn = RaiseZero(hidden_channels,dataset)
 
-        self.gnn_cycle_5 = GIN_P1(hidden_channels,dropout)
-        self.mlp_P0_to_cycle_5 = MLP(hidden_channels,dropout)
-        self.mlp_cycle_6_to_cycle_5 = MLP(in_channels=2*hidden_channels,out_channels=hidden_channels,dropout=dropout)
-        
-        self.gnn_cycle_6 = GIN_P1(hidden_channels,dropout)
-        self.mlp_P0_to_cycle_6 = MLP(hidden_channels,dropout)
-        self.mlp_cycle_5_to_cycle_6 = MLP(in_channels=2*hidden_channels,out_channels=hidden_channels,dropout=dropout)
-        
+        self.lin1 = Linear(2*hidden_channels,hidden_channels)
+
         self.residual = residual
         
-    def forward(self, edge_attr: Tensor, graphs: GraphMapCache, x_P0: p.ptensors0, x_cycle_5: Optional[p.ptensors1], x_cycle_6: Optional[p.ptensors1], edges: Tensor) -> Tuple[p.ptensors0,Optional[p.ptensors1],Optional[p.ptensors1]]:
-        # creating lists of incoming representations
-        P0_atoms = graphs.atoms['G']
-        y_P0 = self.gnn_P0(x_P0,graphs['E','G'],graphs['G','E'],edge_attr,edges)
-
-        if x_cycle_5 is not None:
-            y_P0 = y_P0 + self.mlp_cycle_5_to_P0(x_cycle_5.transfer0(P0_atoms,graphs['G','C_5']))
-            
-            cycle_5_atoms = graphs.atoms['C_5']
-            y_cycle_5 = self.gnn_cycle_5(x_cycle_5,graphs['C_5'])
-            y_cycle_5 = y_cycle_5 + self.mlp_P0_to_cycle_5(x_P0.transfer1(cycle_5_atoms,graphs['C_5','G']))
-        else:
-            y_cycle_5 = None
+    def forward(self, rep: Representation) -> Representation:
+        node_out = self.node_gnn(rep.node_rep,rep.edge_rep,rep.edge_attr,rep.edge_index_node)
         
-        if x_cycle_6 is not None:
-            cycle_6_atoms = graphs.atoms['C_6']
-            y_P0 = y_P0 + self.mlp_cycle_6_to_P0(x_cycle_6.transfer0(P0_atoms,graphs['G','C_6']))
-
-            y_cycle_6 = self.gnn_cycle_6(x_cycle_6,graphs['C_6'])
-            y_cycle_6 = y_cycle_6 + self.mlp_P0_to_cycle_6(x_P0.transfer1(cycle_6_atoms,graphs['C_6','G']))
-
-            if x_cycle_5 is not None:
-                y_cycle_6 = y_cycle_6 + self.mlp_cycle_5_to_cycle_6(x_cycle_5.transfer1(cycle_6_atoms,graphs['C_6','C_5']))
-                y_cycle_5 = y_cycle_5 + self.mlp_cycle_6_to_cycle_5(x_cycle_6.transfer1(cycle_5_atoms,graphs['C_5','C_6']))
-        else:
-            y_cycle_6 = None
+        edge_out_1 = self.edge_gnn(rep.edge_rep,rep.cycle_rep[rep.cycle_edge_cycle_indicator],rep.cycle_edge_attr,rep.edge_index_edge)
+        edge_out_2 = self.node_edge_gnn(rep.edge_rep,rep.node_rep,rep.edge_index_node_edge)
+        edge_out = self.lin1(torch.cat([edge_out_1,edge_out_2],-1))
+        
+        cycle_out = self.edge_cycle_gnn(rep.cycle_rep,rep.edge_rep,rep.edge_index_edge_cycle)
 
         if self.residual:
-            y_P0 = y_P0 + x_P0
-            if x_cycle_5 is not None:
-                y_cycle_5 = y_cycle_5 + x_cycle_5
-            if x_cycle_6 is not None:
-                y_cycle_6 = y_cycle_6 + x_cycle_6
-        
-        return y_P0, y_cycle_5, y_cycle_6
+            node_out = node_out + rep.node_rep
+            edge_out = edge_out + rep.edge_rep
+            cycle_out = cycle_out + rep.cycle_rep
+
+        return Representation(
+            node_out,edge_out,
+            cycle_out,rep.edge_attr,
+            rep.cycle_edge_attr,
+            rep.edge_index_node,
+            rep.edge_index_edge,
+            rep.edge_index_node_edge,
+            rep.edge_index_edge_cycle
+        )
 
 
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, residual: bool) -> None:
+    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC'], residual: bool) -> None:
         super().__init__()
         # Initialization layers
-        self.atom_encoder = AtomEncoder(hidden_dim)
-        self.cycle_5_mlp = MLP(hidden_dim,dropout)
-        self.cycle_6_mlp = MLP(hidden_dim,dropout)
+        self.atom_encoder = get_node_encoder(hidden_dim,dataset)
+        self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
+        self.cycle_encoder = get_cycle_encoder(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual) for _ in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers))
         # finalization layers
         self.final_mlp = Sequential(
             Linear(hidden_dim,2*hidden_dim),
@@ -167,36 +175,29 @@ class Net(Module):
             ReLU(True),
             Linear(2*hidden_dim,1),
         )
-    def forward(self, data: Data, graphs: GraphMapCache) -> Tensor:
+    def forward(self, data: MultiScaleData) -> Tensor:
         # initializing model
-        x : p.ptensors0 = self.atom_encoder(data.x)
-        edges = data.edge_index.transpose(1,0).tolist()
-        edge_attr = data.edge_attr
+        rep = Representation(
+            self.atom_encoder(data.x),
+            self.edge_encoder(data.edge_attr),
+            self.cycle_encoder(data.edge_attr_cycle),
+            data.edge_attr,
+            data.edge_attr_cycle,
+            data.edge_index,
+            data.edge_index_edge,
+            data.edge_index_node_edge,
+            data.edge_index_edge_cycle,
+            data.cycle_edge_cycle_indicator,
+        )
 
-        x_cycle_5 : Union[p.ptensors1,None] = self.cycle_5_mlp(x.unite1(graphs['C_5','G'])) if graphs['C_5'] is not None else None
-        x_cycle_6 : Union[p.ptensors1,None] = self.cycle_6_mlp(x.unite1(graphs['C_6','G'])) if graphs['C_6'] is not None else None
-        
         # performing message passing
         for layer in self.layers:
-            x, x_cycle_5, x_cycle_6 = layer(edge_attr,graphs,x, x_cycle_5, x_cycle_6,edges)
+            rep = layer(rep)
         
         # finalizing model
-        atoms = graphs.atoms['G']
-        h = [x.torch()]
-        if x_cycle_5 is not None:
-            h.append(x_cycle_5.transfer0(atoms,graphs['G','C_5']).torch())
-        if x_cycle_6 is not None:
-            h.append(x_cycle_6.transfer0(atoms,graphs['G','C_6']).torch())
-        
-        # y : Tensor = torch.cat(h,-1)
-        y : Tensor = _sum(h)
-        y = global_mean_pool(y,data.batch)
+        nodes, edges, cycles = rep.node_rep, rep.edge_rep, rep.cycle_rep
+        nodes = global_mean_pool(nodes,data.batch,size=data.num_graphs)
+        edges = global_mean_pool(edges,data.edge_batch,size=data.num_graphs)
+        cycles = global_mean_pool(cycles,data.cycle_batch,size=data.num_graphs)
 
-        y = self.final_mlp(y)
-        return y.flatten()
-        
-
-
-
-        
-        
+        return self.final_mlp(torch.cat([nodes,edges,cycles],-1))
