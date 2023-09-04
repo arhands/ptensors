@@ -61,7 +61,8 @@ class ConvZero(Module):
             self.lin1(node_rep)[edge_index[0]] + 
             self.lin2(node_rep)[edge_index[1]] + 
             self.edge_encoder(edge_attr) + 
-            self.lin3(edge_rep))
+            # self.lin3(edge_rep)
+        )
         messages = self.bn(messages).relu()
         y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=node_rep.size(0))
         return self.mlp(y)
