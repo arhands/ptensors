@@ -73,11 +73,6 @@ class ConvZero(Module):
         self.mlp = get_mlp(hidden_channels,0)
         self.edge_encoder = edge_encoder
     def forward(self, node_rep: Tensor, edge_rep: Tensor, edge_attr: Tensor, edge_index: Tensor):
-        print("node_rep.size()",node_rep.size())
-        print("edge_rep.size()",edge_rep.size())
-        print("edge_attr.size()",edge_attr.size())
-        print("edge_index.size()",edge_index.size())
-        print("edge_index.max()",edge_index.max())
         messages = (
             self.lin1(node_rep)[edge_index[0]] + 
             self.lin2(node_rep)[edge_index[1]] + 

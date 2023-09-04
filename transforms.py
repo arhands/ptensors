@@ -68,8 +68,8 @@ class PreprocessTransform(BaseTransform):
             
             data.cycle_edge_cycle_indicator = edge_pair_cycle_indicator
 
-            data.edge_batch = torch.zeros(edges.num_domains)
-            data.cycle_batch = torch.zeros(len(cycles))
+            data.edge_batch = torch.zeros(edges.num_domains,dtype=torch.int64)
+            data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
             data.num_cycles = len(cycles)
         else:
             
@@ -81,8 +81,8 @@ class PreprocessTransform(BaseTransform):
             
             data.cycle_edge_cycle_indicator = torch.empty(0,dtype=torch.int64)
 
-            data.edge_batch = torch.zeros(edges.num_domains)
-            data.cycle_batch = torch.zeros(0)
+            data.edge_batch = torch.zeros(edges.num_domains,dtype=torch.int64)
+            data.cycle_batch = torch.zeros(0,dtype=torch.int64)
             data.num_cycles = 0
 
         return data
