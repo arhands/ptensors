@@ -114,32 +114,20 @@ class ModelLayer(Module):
 
         self.residual = residual
         
-    def forward(self, rep: Representation) -> Representation:
-        node_out = self.node_gnn(rep.node_rep,rep.edge_rep,rep.edge_attr,rep.edge_index_node)
-        edge_out_1 = self.edge_gnn(rep.edge_rep,rep.cycle_rep[rep.cycle_edge_cycle_indicator],rep.cycle_edge_attr,rep.edge_index_edge)
-        edge_out_2 = self.node_edge_gnn(rep.edge_rep,rep.node_rep,rep.edge_index_node_edge)
+    def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
+        node_out = self.node_gnn(node_rep,edge_rep,data.edge_attr,data.edge_index)
+        edge_out_1 = self.edge_gnn(edge_rep,cycle_rep[data.cycle_edge_cycle_indicator],data.edge_attr_cycle_edge,data.edge_index_edge)
+        edge_out_2 = self.node_edge_gnn(edge_rep,node_rep,data.edge_index_node_edge)
         edge_out = self.lin1(torch.cat([edge_out_1,edge_out_2],-1))
         
-        cycle_out = self.edge_cycle_gnn(rep.cycle_rep,rep.edge_rep,rep.edge_index_edge_cycle)
+        cycle_out = self.edge_cycle_gnn(cycle_rep,edge_rep,data.edge_index_edge_cycle)
 
         if self.residual:
-            node_out = node_out + rep.node_rep
-            edge_out = edge_out + rep.edge_rep
-            cycle_out = cycle_out + rep.cycle_rep
+            node_out = node_out + node_rep
+            edge_out = edge_out + edge_rep
+            cycle_out = cycle_out + cycle_rep
 
-        return Representation(
-            node_out,
-            edge_out,
-            cycle_out,
-            rep.edge_attr,
-            rep.cycle_attr,
-            rep.cycle_edge_attr,
-            rep.edge_index_node,
-            rep.edge_index_edge,
-            rep.edge_index_node_edge,
-            rep.edge_index_edge_cycle,
-            rep.cycle_edge_cycle_indicator,
-        )
+        return node_out, edge_out, cycle_out
 
 
 class Net(Module):

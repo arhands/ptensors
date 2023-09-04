@@ -13,7 +13,7 @@ ssh = SSHClient()
 ssh.load_system_host_keys()
 ssh.connect('lambda.cs.uchicago.edu',username='hands')
 sftp_client = ssh.open_sftp()
-remote_dir = f'/local/hands/PtensBenchmark/example_model/runs'
+remote_dir = f'/local/hands/topological_model/example_model/runs'
 if run_id is None:
     runs = sftp_client.listdir(remote_dir)
     runs = [int(s) for s in runs]
