@@ -146,5 +146,8 @@ class Net(Module):
         nodes = global_mean_pool(node_rep,data.batch,size=data.num_graphs)
         edges = global_mean_pool(edge_rep,data.edge_batch,size=data.num_graphs)
         cycles = global_mean_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
+        
+        edges = torch.zeros_like(edges)
+        cycles = torch.zeros_like(cycles)
 
         return self.final_mlp(torch.cat([nodes,edges,cycles],-1))
