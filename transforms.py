@@ -63,8 +63,8 @@ class PreprocessTransform(BaseTransform):
             data.edge_index_edge = edge_index_edge
             data.edge_index_edge_cycle = edge_index_edge_cycle
 
-            data.edge_attr_cycle_edge = edge_attr_cycle_edge
-            data.edge_attr_cycle = edge_attr_cycle[edge_pair_cycle_indicator]
+            data.edge_attr_cycle = edge_attr_cycle
+            data.edge_attr_cycle_edge = edge_attr_cycle_edge[edge_pair_cycle_indicator]
             
             data.cycle_edge_cycle_indicator = edge_pair_cycle_indicator
 
