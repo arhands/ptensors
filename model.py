@@ -34,6 +34,7 @@ class Representation(NamedTuple):
     cycle_rep: Tensor
     
     edge_attr: Tensor
+    cycle_attr: Tensor
     cycle_edge_attr: Tensor
 
     edge_index_node: Tensor
@@ -120,7 +121,7 @@ class ModelLayer(Module):
         
     def forward(self, rep: Representation) -> Representation:
         node_out = self.node_gnn(rep.node_rep,rep.edge_rep,rep.edge_attr,rep.edge_index_node)
-        edge_out_1 = self.edge_gnn(rep.edge_rep,rep.cycle_rep[rep.cycle_edge_cycle_indicator],rep.edge_index_node_edge,rep.edge_index_edge)
+        edge_out_1 = self.edge_gnn(rep.edge_rep,rep.cycle_rep[rep.cycle_edge_cycle_indicator],rep.cycle_edge_attr,rep.edge_index_edge)
         edge_out_2 = self.node_edge_gnn(rep.edge_rep,rep.node_rep,rep.edge_index_node_edge)
         edge_out = self.lin1(torch.cat([edge_out_1,edge_out_2],-1))
         
@@ -136,6 +137,7 @@ class ModelLayer(Module):
             edge_out,
             cycle_out,
             rep.edge_attr,
+            rep.cycle_attr,
             rep.cycle_edge_attr,
             rep.edge_index_node,
             rep.edge_index_edge,
@@ -171,6 +173,7 @@ class Net(Module):
             self.cycle_encoder(data.edge_attr_cycle),
             data.edge_attr,
             data.edge_attr_cycle,
+            data.edge_attr_cycle_edge,
             data.edge_index,
             data.edge_index_edge,
             data.edge_index_node_edge,
