@@ -24,11 +24,11 @@ def test(model: Module, dataloader: DataLoader, description: str, device: str, p
 def check_trainable_grads(module: Module, ntabs: int = 0):
     bad_params = []
     for p in module.parameters(False):
-        if p.requires_grad:
-            if p.grad is None:
-                bad_params.append((p.size(),None))
-            elif p.grad.abs().max() == 0:
-                bad_params.append((p.size(),0))
+        # if p.requires_grad:
+        if p.grad is None:
+            bad_params.append((p.size(),p.requires_grad,None))
+        elif p.grad.abs().max() == 0:
+            bad_params.append((p.size(),p.requires_grad,0))
     print("%s%s: %s" % ('\t'*ntabs,module._get_name(),', '.join(bad_params)))
     for c in module.children():
         check_trainable_grads(c,ntabs+1)
