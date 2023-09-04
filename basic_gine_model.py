@@ -40,45 +40,6 @@ def get_node_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     else: 
         raise NameError(f'Dataset {ds} unknown.')
 
-class ConvZero(Module):
-    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
-        super().__init__()
-        self.reduce = reduce
-        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.lin2 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.lin3 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.bn = BatchNorm1d(hidden_channels)
-        self.mlp = get_mlp(hidden_channels,0)
-        self.edge_encoder = edge_encoder
-    def forward(self, node_rep: Tensor, edge_rep: Tensor, edge_attr: Tensor, edge_index: Tensor):
-        messages = (
-            self.lin1(node_rep)[edge_index[0]] + 
-            self.lin2(node_rep)[edge_index[1]] + 
-            self.edge_encoder(edge_attr)# + 
-            # self.lin3(edge_rep)
-        )
-        messages = self.bn(messages).relu()
-        y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=node_rep.size(0))
-        return self.mlp(y)
-
-class RaiseZero(Module):
-    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
-        super().__init__()
-        self.reduce = reduce
-        self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
-        self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
-        self.mlp1 = get_mlp(hidden_channels,0)
-        self.mlp2 = get_mlp(hidden_channels,0)
-        self.edge_encoder = edge_encoder
-    def forward(self, edge_rep: Tensor, node_rep: Tensor, edge_index: Tensor):
-        # edge_index: map from nodes to edges.
-        messages = (
-            self.lin1(node_rep)[edge_index[0]] + 
-            (edge_rep * (1 + self.epsilon))[edge_index[1]])
-        messages = self.mlp1(messages)
-        y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=edge_rep.size(0))
-        return self.mlp2(y)
-
 class ModelLayer(Module):
     def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC']) -> None:
         super().__init__()
