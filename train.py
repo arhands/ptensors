@@ -21,6 +21,17 @@ def test(model: Module, dataloader: DataLoader, description: str, device: str, p
     model.train()
     return score_sum/num_graphs
 
+def check_trainable_grads(module: Module, ntabs: int = 0):
+    bad_params = []
+    for p in module.parameters(False):
+        if p.requires_grad:
+            if p.grad is None:
+                bad_params.append((p.size(),None))
+            elif p.grad.abs().max() == 0:
+                bad_params.append((p.size(),0))
+    print("%s%s: %s" % ('\t'*ntabs,module._get_name(),', '.join(bad_params)))
+    for c in module.children():
+        check_trainable_grads(c,ntabs+1)
 def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoader, device: str, best_val_path: str = 'best_val.ckpt', num_epochs: int = 400, lr: float = 0.01, patience: int = 40):
     loss_fn = L1Loss()
     optim = torch.optim.Adam(model.parameters(),lr)
@@ -40,9 +51,8 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
             loss.backward()
-            for p in model.parameters():
-                if p.requires_grad:
-                    assert p.grad.abs().max() != 0
+            check_trainable_grads(model)
+            raise NameError("?")
             optim.step()
 
             loss_float : float = loss.detach().item()
