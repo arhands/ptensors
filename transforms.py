@@ -35,8 +35,8 @@ class PreprocessTransform(BaseTransform):
             edge_index_edge_cycle = edges_to_cycles.domain_map_edge_index
             cycle_cliques = []
             # lens = torch.tensor([len(c) for c in cycles])
-            lengths = []
-            cycles = [torch.tensor(c) for c in cycles]
+            edge_counts = []
+            # cycles = [torch.tensor(c) for c in cycles]
             for i in range(len(cycles)):
                 incoming_edges = edges_to_cycles.domain_map_edge_index[0][edges_to_cycles.domain_map_edge_index[1] == i]
                 length = len(incoming_edges)
@@ -44,21 +44,21 @@ class PreprocessTransform(BaseTransform):
                     incoming_edges.repeat(length),
                     torch.repeat_interleave(incoming_edges,length)
                 ]))
-                lengths.append(length)
+                edge_counts.append(length)
             edge_index_edge = torch.cat(cycle_cliques,-1)
-            lengths = torch.tensor(lengths)
+            edge_counts = torch.tensor(edge_counts)
             # lens2 = lens**2
 
 
             # computing indicator for cycle size
             # TODO: figure out better features for cycles.
             
-
-            edge_attr_cycle = lengths
-            len2 = lengths**2
-            edge_attr_cycle_edge = lengths.repeat_interleave(len2)
+            node_counts = torch.tensor([len(c) for c in cycles])
+            edge_attr_cycle = node_counts
+            edge_counts_squared = edge_counts**2
+            edge_attr_cycle_edge = node_counts.repeat_interleave(edge_counts_squared)
             
-            edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(len2) # needed for mapping cycles to cycle-edge pairs.
+            edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(edge_counts_squared) # needed for mapping cycles to cycle-edge pairs.
 
             data.edge_index_edge = edge_index_edge
             data.edge_index_edge_cycle = edge_index_edge_cycle
