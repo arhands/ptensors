@@ -119,7 +119,7 @@ class Net(Module):
 
         # performing message passing
         for layer in self.layers:
-            node_rep = layer(node_rep)
+            node_rep = layer(node_rep,data)
         
         # finalizing model
         nodes = global_mean_pool(node_rep,data.batch,size=data.num_graphs)
