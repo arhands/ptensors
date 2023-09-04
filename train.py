@@ -40,11 +40,12 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
             loss.backward()
+            found_p = False
             for p in model.parameters():
                 if p.grad is not None:
                     assert p.grad.abs().max() != 0
-                else:
-                    print(p.size())
+                    found_p = True
+            assert found_p
             optim.step()
 
             loss_float : float = loss.detach().item()
