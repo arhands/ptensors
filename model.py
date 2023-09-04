@@ -106,7 +106,7 @@ class ModelLayer(Module):
         super().__init__()
         # self.node_gnn = GINEConv(get_mlp(hidden_channels,dropout),train_eps=True)
         self.node_gnn = ConvZero(hidden_channels,get_edge_encoder(hidden_channels,dataset))
-        self.edge_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset))
+        self.edge_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset),'mean')
         self.node_edge_gnn = RaiseZero(hidden_channels,dataset)
         self.edge_cycle_gnn = RaiseZero(hidden_channels,dataset)
 
