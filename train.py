@@ -41,7 +41,10 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
             loss.backward()
             for p in model.parameters():
-                assert p.grad.abs().max() != 0
+                if p.grad is not None:
+                    assert p.grad.abs().max() != 0
+                else:
+                    print(p.size())
             optim.step()
 
             loss_float : float = loss.detach().item()
