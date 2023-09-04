@@ -4,5 +4,3 @@
 /topological_model.code-workspace
 __pycache__/
 runs
-__pycache__/objects.cpython-310.pyc
-__pycache__/ptensors0.cpython-310.pyc
