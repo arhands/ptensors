@@ -1,4 +1,5 @@
-from model import Net
+# from model import Net
+from basic_gine_model import Net
 from train import train, test
 from loader import get_dataloader
 from torch.cuda import is_available

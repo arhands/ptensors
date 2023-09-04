@@ -4,3 +4,4 @@
 /topological_model.code-workspace
 __pycache__/
 runs
+__pycache__/objects.cpython-310.pyc
