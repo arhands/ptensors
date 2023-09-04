@@ -34,23 +34,31 @@ class PreprocessTransform(BaseTransform):
             edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap)
             edge_index_edge_cycle = edges_to_cycles.domain_map_edge_index
             cycle_cliques = []
-            lens = torch.tensor([len(c) for c in cycles])
+            # lens = torch.tensor([len(c) for c in cycles])
+            lengths = []
             cycles = [torch.tensor(c) for c in cycles]
-            for c in cycles:
+            for i in range(len(cycles)):
+                incoming_edges = edges_to_cycles.domain_map_edge_index[0][edges_to_cycles.domain_map_edge_index[1] == i]
+                length = len(incoming_edges)
                 cycle_cliques.append(torch.stack([
-                    c.repeat(len(c)),
-                    torch.repeat_interleave(c,len(c))
+                    incoming_edges.repeat(length),
+                    torch.repeat_interleave(incoming_edges,length)
                 ]))
+                lengths.append(length)
             edge_index_edge = torch.cat(cycle_cliques,-1)
-            lens2 = lens**2
+            lengths = torch.tensor(lengths)
+            # lens2 = lens**2
 
 
             # computing indicator for cycle size
             # TODO: figure out better features for cycles.
-            edge_attr_cycle_edge = lens.repeat_interleave(lens2)
-            edge_attr_cycle = lens
             
-            edge_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(lens) # needed for mapping cycles to cycle-edge pairs.
+
+            edge_attr_cycle = lengths
+            len2 = lengths**2
+            edge_attr_cycle_edge = lengths.repeat_interleave(len2)
+            
+            edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(len2) # needed for mapping cycles to cycle-edge pairs.
 
             data.edge_index_edge = edge_index_edge
             data.edge_index_edge_cycle = edge_index_edge_cycle
@@ -58,7 +66,7 @@ class PreprocessTransform(BaseTransform):
             data.edge_attr_cycle_edge = edge_attr_cycle_edge
             data.edge_attr_cycle = edge_attr_cycle
             
-            data.cycle_edge_cycle_indicator = edge_cycle_indicator
+            data.cycle_edge_cycle_indicator = edge_pair_cycle_indicator
 
             data.edge_batch = torch.zeros(edges.num_domains)
             data.cycle_batch = torch.zeros(len(cycles))
