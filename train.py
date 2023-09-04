@@ -29,6 +29,7 @@ def check_trainable_grads(module: Module, ntabs: int = 0):
             bad_params.append((p.size(),p.requires_grad,None))
         elif p.grad.abs().max() == 0:
             bad_params.append((p.size(),p.requires_grad,0))
+    bad_params = [str(s) for s in bad_params]
     print("%s%s: %s" % ('\t'*ntabs,module._get_name(),', '.join(bad_params)))
     for c in module.children():
         check_trainable_grads(c,ntabs+1)
