@@ -73,6 +73,11 @@ class ConvZero(Module):
         self.mlp = get_mlp(hidden_channels,0)
         self.edge_encoder = edge_encoder
     def forward(self, node_rep: Tensor, edge_rep: Tensor, edge_attr: Tensor, edge_index: Tensor):
+        print("node_rep.size()",node_rep.size())
+        print("edge_rep.size()",edge_rep.size())
+        print("edge_attr.size()",edge_attr.size())
+        print("edge_index.size()",edge_index.size())
+        print("edge_index.max()",edge_index.max())
         messages = (
             self.lin1(node_rep)[edge_index[0]] + 
             self.lin2(node_rep)[edge_index[1]] + 
@@ -115,13 +120,6 @@ class ModelLayer(Module):
         
     def forward(self, rep: Representation) -> Representation:
         node_out = self.node_gnn(rep.node_rep,rep.edge_rep,rep.edge_attr,rep.edge_index_node)
-        print(rep.node_rep.size())
-        print(rep.edge_rep.size())
-        print(rep.cycle_rep.size())
-        print(rep.cycle_rep[rep.cycle_edge_cycle_indicator].size())
-        print(rep.cycle_edge_cycle_indicator.size(),rep.cycle_edge_cycle_indicator.max())
-        print(rep.cycle_edge_attr.size())
-        print(rep.edge_index_edge.size())
         edge_out_1 = self.edge_gnn(rep.edge_rep,rep.cycle_rep[rep.cycle_edge_cycle_indicator],rep.cycle_edge_attr,rep.edge_index_edge)
         edge_out_2 = self.node_edge_gnn(rep.edge_rep,rep.node_rep,rep.edge_index_node_edge)
         edge_out = self.lin1(torch.cat([edge_out_1,edge_out_2],-1))
