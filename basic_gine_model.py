@@ -89,7 +89,7 @@ class ModelLayer(Module):
         self.residual = residual
         
     def forward(self, x: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
-        y = self.conv(x,data.edge_index,data.edge_attr)
+        y = self.conv(x,data.edge_index,self.edge_encoder(data.edge_attr))
 
         if self.residual:
             y = y + x 
