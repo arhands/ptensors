@@ -60,7 +60,7 @@ class ConvZero(Module):
         messages = (
             self.lin1(node_rep)[edge_index[0]] + 
             self.lin2(node_rep)[edge_index[1]] + 
-            self.edge_encoder(edge_attr) + 
+            self.edge_encoder(edge_attr)# + 
             # self.lin3(edge_rep)
         )
         messages = self.bn(messages).relu()
