@@ -15,7 +15,7 @@ def test(model: Module, dataloader: DataLoader, description: str, device: str, p
         batch = batch.to(device)
         pred = model(batch)
         score = l1_loss(pred,batch.y).detach().item()
-        assert torch.isclose(score,(pred - batch.y).abs().mean())
+        assert torch.isclose(torch.tensor(score),(pred - batch.y).abs().mean())
         score_sum += score*batch.num_graphs
         num_graphs += batch.num_graphs
         loop.set_postfix(avg_score=score_sum/num_graphs)
