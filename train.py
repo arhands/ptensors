@@ -51,7 +51,8 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
         total_graphs = 0
         epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
         lr = sched.optimizer.param_groups[0]['lr']
-        for batch in epoch_loop:
+        # for batch in epoch_loop:
+        for batch in train_dataloader:
             batch = batch.to(device)
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
