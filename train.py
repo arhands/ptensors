@@ -15,6 +15,7 @@ def test(model: Module, dataloader: DataLoader, description: str, device: str, p
         batch = batch.to(device)
         pred = model(batch)
         score = l1_loss(pred,batch.y).detach().item()
+        assert torch.isclose(score,(pred - batch.y).abs().mean())
         score_sum += score*batch.num_graphs
         num_graphs += batch.num_graphs
         loop.set_postfix(avg_score=score_sum/num_graphs)
@@ -51,8 +52,7 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
         total_graphs = 0
         epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
         lr = sched.optimizer.param_groups[0]['lr']
-        # for batch in epoch_loop:
-        for batch in train_dataloader:
+        for batch in epoch_loop:
             batch = batch.to(device)
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
