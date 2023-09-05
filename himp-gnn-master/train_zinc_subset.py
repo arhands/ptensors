@@ -9,6 +9,7 @@ from torch_geometric.data import DataLoader
 
 from transform import JunctionTree
 from model import Net
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', type=int, default=0)
@@ -62,33 +63,39 @@ def test(loader):
     return total_error / len(loader.dataset)
 
 
-test_maes = []
-for run in range(1, 5):
+model.reset_parameters()
+optimizer = Adam(model.parameters(), lr=0.001)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5,
+                                patience=10, min_lr=0.00001)
+
+best_val_mae = test_mae = float('inf')
+main_loop = tqdm(range(1, args.epochs + 1))
+for epoch in main_loop:
+    lr = scheduler.optimizer.param_groups[0]['lr']
+    loss = train(epoch)
+    val_mae = test(val_loader)
+    scheduler.step(val_mae)
+
+    if val_mae < best_val_mae:
+        best_val_mae = val_mae
+        # test_mae = test(test_loader)
+        torch.save('best_val.ckpt',{
+            'epoch' : epoch,
+            'score' : val_mae,
+            'state_dict' : model.state_dict(),
+            'loss' : loss,
+        })
+    main_loop.set_postfix(lr=lr,loss=loss,val=val_mae,best_val=best_val_mae)
     print()
-    print(f'Run {run}:')
-    print()
 
-    model.reset_parameters()
-    optimizer = Adam(model.parameters(), lr=0.001)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5,
-                                  patience=10, min_lr=0.00001)
+best = torch.load('best_val.ckpt')
+best_val_epoch = best['epoch']
+best_val_score = best['score']
+best_val_loss = best['loss']
+model.load_state_dict(best['state_dict'])
+best_test_score = test(test_loader)
+print("best_val_epoch",best_val_epoch)
+print("best_val_score",best_val_score)
+print("best_val_loss",best_val_loss)
+print("best_val_test_score",best_test_score)
 
-    best_val_mae = test_mae = float('inf')
-    for epoch in range(1, args.epochs + 1):
-        lr = scheduler.optimizer.param_groups[0]['lr']
-        loss = train(epoch)
-        val_mae = test(val_loader)
-        scheduler.step(val_mae)
-
-        if val_mae < best_val_mae:
-            best_val_mae = val_mae
-            test_mae = test(test_loader)
-
-        print(f'Epoch: {epoch:03d}, LR: {lr:.5f}, Loss: {loss:.4f}, '
-              f'Val: {val_mae:.4f}, Test: {test_mae:.4f}')
-
-    test_maes.append(test_mae)
-
-test_mae = torch.tensor(test_maes)
-print('===========================')
-print(f'Final Test: {test_mae.mean():.4f} ± {test_mae.std():.4f}')
