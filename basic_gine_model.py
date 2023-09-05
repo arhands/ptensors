@@ -79,7 +79,7 @@ class Net(Module):
         )
     def forward(self, data: MultiScaleData) -> Tensor:
         # initializing model
-        node_rep = self.atom_encoder(data.x)
+        node_rep = self.atom_encoder(data.x.flatten())
 
         # performing message passing
         for layer in self.layers:
