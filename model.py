@@ -60,8 +60,8 @@ class ConvZero(Module):
         messages = (
             self.lin1(node_rep)[edge_index[0]] + 
             self.lin2(node_rep)[edge_index[1]] + 
-            self.edge_encoder(edge_attr)# + 
-            # self.lin3(edge_rep)
+            self.edge_encoder(edge_attr) + 
+            self.lin3(edge_rep)
         )
         messages = self.bn(messages).relu()
         y = scatter(messages,edge_index[1],0,reduce=self.reduce,dim_size=node_rep.size(0))
@@ -88,7 +88,6 @@ class RaiseZero(Module):
 class ModelLayer(Module):
     def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC']) -> None:
         super().__init__()
-        # self.node_gnn = GINEConv(get_mlp(hidden_channels,dropout),train_eps=True)
         self.node_gnn = ConvZero(hidden_channels,get_edge_encoder(hidden_channels,dataset))
         self.edge_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset),'mean')
         self.node_edge_gnn = RaiseZero(hidden_channels,dataset)
@@ -126,8 +125,7 @@ class Net(Module):
         self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers))
         # finalization layers
         self.final_mlp = Sequential(
-            Linear(hidden_dim*3,2*hidden_dim),
-            # Linear(3*hidden_dim,2*hidden_dim,False),
+            Linear(hidden_dim*3,2*hidden_dim,bias=False),
             BatchNorm1d(2*hidden_dim),
             ReLU(True),
             Linear(2*hidden_dim,1),
@@ -147,7 +145,4 @@ class Net(Module):
         edges = global_mean_pool(edge_rep,data.edge_batch,size=data.num_graphs)
         cycles = global_mean_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
         
-        edges = torch.zeros_like(edges)
-        cycles = torch.zeros_like(cycles)
-
         return self.final_mlp(torch.cat([nodes,edges,cycles],-1))

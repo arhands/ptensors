@@ -14,7 +14,7 @@ def test(model: Module, dataloader: DataLoader, description: str, device: str, p
     for batch in loop:
         batch = batch.to(device)
         pred = model(batch)
-        score = l1_loss(pred,batch.y).detach().item()
+        score = l1_loss(pred.flatten(),batch.y.flatten()).detach().item()
         score_sum += score*batch.num_graphs
         num_graphs += batch.num_graphs
         loop.set_postfix(avg_score=score_sum/num_graphs)
@@ -47,7 +47,6 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
     best_val = torch.inf
     train_loop = tqdm(range(num_epochs),total=num_epochs)
     for epoch in train_loop:
-        grad_sum = 0
         loss_sum = 0
         total_graphs = 0
         epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
@@ -55,9 +54,8 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
         for batch in epoch_loop:
             batch = batch.to(device)
             optim.zero_grad()
-            loss : torch.Tensor = loss_fn(model(batch),batch.y)
+            loss : torch.Tensor = loss_fn(model(batch).flatten(),batch.y.flatten())
             loss.backward()
-            grad_sum += next(iter(model.atom_encoder.parameters())).grad.abs().sum().item()
             # check_trainable_grads(model)
             # raise NameError("?")
             optim.step()
@@ -81,7 +79,7 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
 
         train_history.append(loss_float)
         val_history.append(val_score)
-        train_loop.set_postfix(best_val=best_val,train=loss_float,val=val_score,lr=lr,grad_sum=grad_sum)
+        train_loop.set_postfix(best_val=best_val,train=loss_float,val=val_score,lr=lr)
     
     state = torch.load(best_val_path)
     best_val_epoch : int = state['epoch']

@@ -1,5 +1,5 @@
-# from model import Net
-from model_gine_2 import Net
+from model import Net
+# from model_gine_2 import Net
 from train import train, test
 from loader import get_dataloader
 from torch.cuda import is_available
