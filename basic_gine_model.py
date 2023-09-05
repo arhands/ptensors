@@ -1,6 +1,7 @@
 from __future__ import annotations
 import torch
-from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, ModuleList
+from torch.nn import Module, Sequential, ReLU, Linear, Dropout, Parameter, Embedding, ModuleList
+# from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, ModuleList
 from torch import Tensor
 from typing import Literal, NamedTuple, Union, Optional, Tuple
 from torch_geometric.data import Data
@@ -17,10 +18,10 @@ def get_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: O
         hidden_channels = 2 * out_channels
     layers = [
         Linear(in_channels,hidden_channels,False),
-        BatchNorm1d(hidden_channels),
+        # BatchNorm1d(hidden_channels),
         ReLU(True),
         Linear(hidden_channels,hidden_channels,False),
-        BatchNorm1d(hidden_channels),
+        # BatchNorm1d(hidden_channels),
         ReLU(True),
         Linear(hidden_channels,out_channels,bias),
     ]
@@ -70,7 +71,7 @@ class Net(Module):
         self.final_mlp = Sequential(
             Linear(hidden_dim,2*hidden_dim),
             # Linear(3*hidden_dim,2*hidden_dim,False),
-            BatchNorm1d(2*hidden_dim),
+            # BatchNorm1d(2*hidden_dim),
             ReLU(True),
             Linear(2*hidden_dim,1),
         )
