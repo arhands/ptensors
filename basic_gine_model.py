@@ -74,6 +74,9 @@ class Net(Module):
             ReLU(True),
             Linear(2*hidden_dim,1),
         )
+        self.final_mlp = Sequential(
+            Linear(hidden_dim,1),
+        )
     def forward(self, data: MultiScaleData) -> Tensor:
         # initializing model
         node_rep = self.atom_encoder(data.x)
