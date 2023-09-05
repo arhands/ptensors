@@ -22,8 +22,8 @@ parser.add_argument('--num_layers',type=int,default=6)
 parser.add_argument('--residual',action='store_true')
 parser.add_argument('--dropout',type=float,default=0.)
 
-parser.add_argument('--patience',type=int,default=40)
-parser.add_argument('--num_epochs',type=int,default=400)
+parser.add_argument('--patience',type=int,default=20)
+parser.add_argument('--num_epochs',type=int,default=1000)
 parser.add_argument('--lr',type=float,default=0.001)
 parser.add_argument('--train_batch_size',type=int,default=128)
 

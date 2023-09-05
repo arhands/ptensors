@@ -35,7 +35,7 @@ def check_trainable_grads(module: Module, ntabs: int = 0):
         check_trainable_grads(c,ntabs+1)
 
 
-def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoader, device: str, best_val_path: str = 'best_val.ckpt', num_epochs: int = 400, lr: float = 0.01, patience: int = 40):
+def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoader, device: str, best_val_path: str = 'best_val.ckpt', num_epochs: int = 400, lr: float = 0.01, patience: int = 40, early_stopping: bool = True, min_lr: float=0.0001):
     print("trainable num params:",sum(p.numel() for p in model.parameters() if p.requires_grad))
     loss_fn = L1Loss()
     optim = torch.optim.Adam(model.parameters(),lr)
@@ -50,7 +50,6 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
         loss_sum = 0
         total_graphs = 0
         epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
-        lr = sched.optimizer.param_groups[0]['lr']
         for batch in epoch_loop:
             batch = batch.to(device)
             optim.zero_grad()
@@ -65,9 +64,12 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             total_graphs += batch.num_graphs
             epoch_loop.set_postfix(avg_loss = loss_sum/total_graphs)
         loss_float = loss_sum / total_graphs
-        sched.step(loss_float,epoch)
-
         val_score = test(model,val_dataloader,'val',device)
+        sched.step(val_score,epoch)
+        lr = optim.param_groups[0]['lr']
+        # copying cwn and benchmarking gnns code: https://github.com/twitter-research/cwn/blob/main/exp/run_exp.py#L404C16-L404C16
+        if early_stopping and lr < min_lr:
+            break
         
         if val_score < best_val:
             torch.save({

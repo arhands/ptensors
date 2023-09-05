@@ -9,7 +9,7 @@ from ptensors0 import TransferData0, transfer0_0
 from torch_scatter import scatter
 from objects import MultiScaleData
 
-def get_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None):
+def get_mlp(in_channels: int, dropout: float, bias: bool = True, final_linear: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None):
     assert 0 <= dropout < 1, 'Dropout must fall in the interval [0,1).'
     if out_channels is None:
         out_channels = in_channels
@@ -19,11 +19,20 @@ def get_mlp(in_channels: int, dropout: float, bias: bool = True, out_channels: O
         Linear(in_channels,hidden_channels,False),
         BatchNorm1d(hidden_channels),
         ReLU(True),
-        Linear(hidden_channels,hidden_channels,False),
-        BatchNorm1d(hidden_channels),
-        ReLU(True),
-        Linear(hidden_channels,out_channels,bias),
     ]
+    if final_linear:
+        layers.extend([
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
+            ReLU(True),
+            Linear(hidden_channels,out_channels,bias),
+        ])
+    else:
+        layers.extend([
+            Linear(hidden_channels,out_channels,False),
+            BatchNorm1d(out_channels),
+            ReLU(True),
+        ])
     if dropout > 0:
         layers.append(Dropout(dropout))
     return Sequential(*layers)
@@ -47,14 +56,14 @@ def get_cycle_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
         raise NameError(f'Dataset {ds} unknown.')
 
 class ConvZero(Module):
-    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
+    def __init__(self, hidden_channels: int, edge_encoder: Module, bias: bool, reduce: str) -> None:
         super().__init__()
         self.reduce = reduce
         self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
         self.lin2 = Linear(hidden_channels,hidden_channels,bias=False)
         self.lin3 = Linear(hidden_channels,hidden_channels,bias=False)
         self.bn = BatchNorm1d(hidden_channels)
-        self.mlp = get_mlp(hidden_channels,0)
+        self.mlp = get_mlp(hidden_channels,0,bias)
         self.edge_encoder = edge_encoder
     def forward(self, node_rep: Tensor, edge_rep: Tensor, edge_attr: Tensor, edge_index: Tensor):
         messages = (
@@ -68,13 +77,13 @@ class ConvZero(Module):
         return self.mlp(y)
 
 class RaiseZero(Module):
-    def __init__(self, hidden_channels: int, edge_encoder: Module, reduce: str = 'sum') -> None:
+    def __init__(self, hidden_channels: int, edge_encoder: Module,bias: bool, reduce: str) -> None:
         super().__init__()
         self.reduce = reduce
         self.lin1 = Linear(hidden_channels,hidden_channels,bias=False)
         self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
-        self.mlp1 = get_mlp(hidden_channels,0)
-        self.mlp2 = get_mlp(hidden_channels,0)
+        self.mlp1 = get_mlp(hidden_channels,0,final_linear=False)
+        self.mlp2 = get_mlp(hidden_channels,0,bias,bias)
         self.edge_encoder = edge_encoder
     def forward(self, edge_rep: Tensor, node_rep: Tensor, edge_index: Tensor):
         # edge_index: map from nodes to edges.
@@ -86,22 +95,23 @@ class RaiseZero(Module):
         return self.mlp2(y)
 
 class ModelLayer(Module):
-    def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC']) -> None:
+    def __init__(self, hidden_channels: int, dropout: float, residual: bool, dataset: Literal['ZINC'], bias: bool) -> None:
         super().__init__()
-        self.node_gnn = ConvZero(hidden_channels,get_edge_encoder(hidden_channels,dataset))
-        self.edge_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset),'mean')
-        self.node_edge_gnn = RaiseZero(hidden_channels,dataset)
-        self.edge_cycle_gnn = RaiseZero(hidden_channels,dataset,'mean')
+        self.node_gnn = ConvZero(hidden_channels,get_edge_encoder(hidden_channels,dataset),True)
+        self.edge_gnn = ConvZero(hidden_channels,get_cycle_encoder(hidden_channels,dataset),bias,'mean')
+        self.node_edge_gnn = RaiseZero(hidden_channels,dataset,bias)
+        self.edge_cycle_gnn = RaiseZero(hidden_channels,dataset,True,'mean')
 
-        self.lin1 = Linear(2*hidden_channels,hidden_channels)
+        self.edge_bn = BatchNorm1d(hidden_channels)
 
         self.residual = residual
         
     def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
-        node_out = self.node_gnn(node_rep,edge_rep,data.edge_attr,data.edge_index)
+        node_out = self.node_gnn(node_rep,edge_rep,data.edge_attr,data.edge_index).relu()
+
         edge_out_1 = self.edge_gnn(edge_rep,cycle_rep[data.cycle_edge_cycle_indicator],data.edge_attr_cycle_edge,data.edge_index_edge)
         edge_out_2 = self.node_edge_gnn(edge_rep,node_rep,data.edge_index_node_edge)
-        edge_out = self.lin1(torch.cat([edge_out_1,edge_out_2],-1))
+        edge_out = self.edge_bn(edge_out_1 + edge_out_2).relu()
         
         cycle_out = self.edge_cycle_gnn(cycle_rep,edge_rep,data.edge_index_edge_cycle)
 
@@ -122,11 +132,10 @@ class Net(Module):
         self.cycle_encoder = get_cycle_encoder(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset,i+1==num_layers) for i in range(num_layers))
         # finalization layers
         self.final_mlp = Sequential(
-            Linear(hidden_dim*3,2*hidden_dim,bias=False),
-            BatchNorm1d(2*hidden_dim),
+            BatchNorm1d(hidden_dim),
             ReLU(True),
             Linear(2*hidden_dim,1),
         )
@@ -145,4 +154,4 @@ class Net(Module):
         edges = global_mean_pool(edge_rep,data.edge_batch,size=data.num_graphs)
         cycles = global_mean_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
         
-        return self.final_mlp(torch.cat([nodes,edges,cycles],-1))
+        return self.final_mlp(nodes + edges + cycles)
