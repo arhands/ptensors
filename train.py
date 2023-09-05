@@ -33,6 +33,8 @@ def check_trainable_grads(module: Module, ntabs: int = 0):
     print("%s%s: %s" % ('\t'*ntabs,module._get_name(),', '.join(bad_params)))
     for c in module.children():
         check_trainable_grads(c,ntabs+1)
+
+
 def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoader, device: str, best_val_path: str = 'best_val.ckpt', num_epochs: int = 400, lr: float = 0.01, patience: int = 40):
     print("trainable num params:",sum(p.numel() for p in model.parameters() if p.requires_grad))
     loss_fn = L1Loss()
@@ -48,6 +50,7 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
         loss_sum = 0
         total_graphs = 0
         epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
+        lr = sched.optimizer.param_groups[0]['lr']
         for batch in epoch_loop:
             batch = batch.to(device)
             optim.zero_grad()
@@ -76,7 +79,7 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
 
         train_history.append(loss_float)
         val_history.append(val_score)
-        train_loop.set_postfix(best_val=best_val,train=loss_float,val=val_score)
+        train_loop.set_postfix(best_val=best_val,train=loss_float,val=val_score,lr=lr)
     
     state = torch.load(best_val_path)
     best_val_epoch : int = state['epoch']
