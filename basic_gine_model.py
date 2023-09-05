@@ -50,6 +50,9 @@ class ModelLayer(Module):
         self.residual = residual
         
     def forward(self, x: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
+        print(x.size())
+        print(data.edge_index.size())
+        print(data.edge_attr.size())
         y = self.conv(x,data.edge_index,self.edge_encoder(data.edge_attr))
 
         if self.residual:
