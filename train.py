@@ -47,7 +47,7 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
     for epoch in train_loop:
         loss_sum = 0
         total_graphs = 0
-        epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=2)
+        epoch_loop = tqdm(train_dataloader,'train',total=len(train_dataloader),leave=False,position=1)
         for batch in epoch_loop:
             batch = batch.to(device)
             optim.zero_grad()
