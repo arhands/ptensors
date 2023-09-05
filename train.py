@@ -53,7 +53,6 @@ def train(model: Module, train_dataloader: DataLoader, val_dataloader: DataLoade
             optim.zero_grad()
             loss : torch.Tensor = loss_fn(model(batch),batch.y)
             loss.backward()
-            print(next(iter(model.atom_encoder.parameters())).abs().sum())
             # check_trainable_grads(model)
             # raise NameError("?")
             optim.step()

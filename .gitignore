@@ -5,3 +5,4 @@
 __pycache__/
 runs
 __pycache__/objects.cpython-310.pyc
+tmp/
