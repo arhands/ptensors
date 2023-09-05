@@ -65,7 +65,7 @@ class Net(Module):
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers))
+        self.layers = ModuleList([ModelLayer(hidden_dim,dropout,residual,dataset) for _ in range(num_layers)])
         # finalization layers
         self.final_mlp = Sequential(
             Linear(hidden_dim,2*hidden_dim),
