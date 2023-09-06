@@ -123,7 +123,7 @@ class Net(Module):
         self.cycle_encoder = get_cycle_encoder(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,residual,dataset,i+1==num_layers) for i in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim) for _ in range(num_layers))
         # finalization layers
         self.pool_mlps = ModuleList([Sequential(
             Linear(hidden_dim,hidden_dim,False),
