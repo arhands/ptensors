@@ -14,19 +14,29 @@ class PreprocessTransform(BaseTransform):
         
         data.x = data.x.flatten()
         data.edge_attr = data.edge_attr.flatten()
-
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
+
+        # first, we compute maps between edges and nodes.
+        # NOTE: we assume graph is simple and undirected.
+        increasing_edge_mask = data.edge_index[0] <= data.edge_index[1]
+        data.edge_attr = data.edge_attr[increasing_edge_mask]
+        increasing_edge_index : Tensor = data.edge_index[:,increasing_edge_mask]
+        edge_index = torch.cat([increasing_edge_index,increasing_edge_index.flip(0)],-1)
+
+        # an indicator for mapping features to node->node messages.
+        num_edges = len(increasing_edge_mask)
+        data.edge2node_msg_ind = torch.arange(num_edges).tile(2)
+
+        data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
+
+        # getting cycle related maps
         cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
-        # nodes = atomspack1(torch.arange(num_nodes),torch.arange(num_nodes),num_nodes)
-        edges = atomspack1(edge_index.transpose(1,0).flatten(),torch.arange(edge_index.size(1)).repeat_interleave(2),edge_index.size(1))
-        
-        edge_index_node_edge = torch.stack([edge_index[0],torch.arange(edges.num_domains)],0)
-        data.edge_index_node_edge = edge_index_node_edge
-        
+        data.num_cycles = len(cycles)
+
         if len(cycles) > 0:
 
-            
+            edges = atomspack1(increasing_edge_index.transpose(1,0).flatten(),torch.arange(increasing_edge_index.size(1)).repeat_interleave(2),increasing_edge_index.size(1))
             cycles = [c.to_list() for c in cycles]
             cycles_ap = atomspack1.from_list(cycles)
 
@@ -56,32 +66,28 @@ class PreprocessTransform(BaseTransform):
             node_counts = torch.tensor([len(c) for c in cycles])
             edge_attr_cycle = node_counts
             edge_counts_squared = edge_counts**2
-            edge_attr_cycle_edge = node_counts.repeat_interleave(edge_counts_squared)
             
             edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(edge_counts_squared) # needed for mapping cycles to cycle-edge pairs.
 
-            data.edge_index_edge = edge_index_edge
-            data.edge_index_edge_cycle = edge_index_edge_cycle
+            data.edge2edge_map = edge_index_edge
+            data.edge2cycle_map = edge_index_edge_cycle
 
-            data.edge_attr_cycle = edge_attr_cycle
-            data.edge_attr_cycle_edge = edge_attr_cycle_edge[edge_pair_cycle_indicator]
+            data.cycle_attr = edge_attr_cycle
             
-            data.cycle_edge_cycle_indicator = edge_pair_cycle_indicator
+            data.cycle2edge_msg_ind = edge_pair_cycle_indicator
 
-            data.edge_batch = torch.zeros(edges.num_domains,dtype=torch.int64)
             data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
-            data.num_cycles = len(cycles)
+            
         else:
             
-            data.edge_index_edge = torch.empty(2,0,dtype=torch.int64)
-            data.edge_index_edge_cycle = torch.empty(2,0,dtype=torch.int64)
+            data.edge2edge_map = torch.empty(2,0,dtype=torch.int64)
+            data.edge2cycle_map = torch.empty(2,0,dtype=torch.int64)
 
-            data.edge_attr_cycle_edge = torch.empty(0,dtype=torch.int64)
-            data.edge_attr_cycle = torch.empty(0,dtype=torch.int64)
+            data.cycle_attr = torch.empty(0,dtype=torch.int64)
             
-            data.cycle_edge_cycle_indicator = torch.empty(0,dtype=torch.int64)
+            data.cycle2edge_msg_ind = torch.empty(0,dtype=torch.int64)
 
-            data.edge_batch = torch.zeros(edges.num_domains,dtype=torch.int64)
+            data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
             data.cycle_batch = torch.zeros(0,dtype=torch.int64)
             data.num_cycles = 0
 
