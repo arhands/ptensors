@@ -153,5 +153,5 @@ class Net(Module):
             global_add_pool(edge_rep,data.edge_batch,size=data.num_graphs),
             global_add_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
         ]
-        rep = torch.sum([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)])
+        rep = torch.sum(torch.stack([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)]),0)
         return self.lin(rep)
