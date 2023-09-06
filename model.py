@@ -88,6 +88,7 @@ class LiftLayer(Module):
     def forward(self, node_rep: Tensor, edge_index: Tensor, edge_rep: Tensor) -> Tensor:
         agg = scatter_sum(node_rep[edge_index[0]],edge_index[1],0,dim_size=edge_rep.size(1))
         ident = (1 + self.epsilon)*edge_rep
+        print(agg.size(),ident.size())
         raw = agg + ident
         return self.mlp(raw)
 
