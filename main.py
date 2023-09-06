@@ -17,8 +17,8 @@ filterwarnings("ignore",category=DeprecationWarning)
 filterwarnings("ignore",category=UserWarning)
 
 parser = ArgumentParser()
-parser.add_argument('--hidden_channels',type=int,default=64)
-parser.add_argument('--num_layers',type=int,default=6)
+parser.add_argument('--hidden_channels',type=int,default=48)
+parser.add_argument('--num_layers',type=int,default=2)
 parser.add_argument('--residual',action='store_true')
 parser.add_argument('--dropout',type=float,default=0.)
 
