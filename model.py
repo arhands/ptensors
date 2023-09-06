@@ -80,6 +80,9 @@ class LiftLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.mlp = Sequential(
+            Linear(hidden_channels,2*hidden_channels,False),
+            BatchNorm1d(2*hidden_channels),
+            ReLU(True),
             Linear(2*hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
@@ -88,7 +91,6 @@ class LiftLayer(Module):
     def forward(self, node_rep: Tensor, edge_index: Tensor, edge_rep: Tensor) -> Tensor:
         agg = scatter_sum(node_rep[edge_index[0]],edge_index[1],0,dim_size=edge_rep.size(0))
         ident = (1 + self.epsilon)*edge_rep
-        print(agg.size(),ident.size())
         raw = agg + ident
         return self.mlp(raw)
 
