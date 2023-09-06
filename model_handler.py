@@ -22,15 +22,15 @@ class ModelHandler(pl.LightningModule):
     def forward(self, data: MultiScaleData) -> Tensor:
         return self.model(data).flatten()
     
-    def training_step(self, batch: Batch[MultiScaleData], batch_idx: int):
+    def training_step(self, batch: Batch, batch_idx: int):
         pred = self(batch)
         loss = self.loss_fn(pred,batch.y.flatten())
         self.log('train_loss',loss,True,batch_size=batch.num_graphs,on_step=True,on_epoch=True)
         return loss
 
-    def validation_step(self, batch: Batch[MultiScaleData], batch_idx: int):
+    def validation_step(self, batch: Batch, batch_idx: int):
         self.valid_score_fn(self(batch),batch.y.flatten())
-    def test_step(self, batch: Batch[MultiScaleData], batch_idx: int):
+    def test_step(self, batch: Batch, batch_idx: int):
         self.test_score_fn(self(batch),batch.y.flatten())
     def on_validation_epoch_end(self) -> None:
         self.log('val_score',self.valid_score_fn,on_epoch=True)
