@@ -145,9 +145,9 @@ class MultiScaleData(Data):
 
     def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
         if key in ['edge2node_msg_ind','edge2edge_map']:
-            return torch.tensor(self.edge_attr.size(1))
+            return torch.tensor(len(self.edge_attr))
         elif key == 'edge2cycle_map':
-            return torch.tensor([[self.edge_attr.size(1)],[self.num_cycles]])
+            return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
         elif key == 'cycle2edge_msg_ind':
             return torch.tensor(self.num_cycles)
         elif key == 'edge_batch':
