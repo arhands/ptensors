@@ -25,7 +25,7 @@ class PreprocessTransform(BaseTransform):
         edge_index = torch.cat([increasing_edge_index,increasing_edge_index.flip(0)],-1)
 
         # an indicator for mapping features to node->node messages.
-        num_edges = len(increasing_edge_mask)
+        num_edges = increasing_edge_index.size(1)
         data.edge2node_msg_ind = torch.arange(num_edges).tile(2)
 
         data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
