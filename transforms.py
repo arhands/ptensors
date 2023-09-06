@@ -69,8 +69,8 @@ class PreprocessTransform(BaseTransform):
             
             edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(edge_counts_squared) # needed for mapping cycles to cycle-edge pairs.
 
-            data.edge2edge_map = edge_index_edge
-            data.edge2cycle_map = edge_index_edge_cycle
+            data.edge2edge_edge_index = edge_index_edge
+            data.edge2cycle_edge_index = edge_index_edge_cycle
 
             data.cycle_attr = edge_attr_cycle
             
@@ -80,8 +80,8 @@ class PreprocessTransform(BaseTransform):
             
         else:
             
-            data.edge2edge_map = torch.empty(2,0,dtype=torch.int64)
-            data.edge2cycle_map = torch.empty(2,0,dtype=torch.int64)
+            data.edge2edge_edge_index = torch.empty(2,0,dtype=torch.int64)
+            data.edge2cycle_edge_index = torch.empty(2,0,dtype=torch.int64)
 
             data.cycle_attr = torch.empty(0,dtype=torch.int64)
             

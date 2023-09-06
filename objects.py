@@ -129,10 +129,10 @@ class MultiTransferData1:
 class MultiScaleData(Data):
     edge2node_msg_ind: Tensor
 
-    edge2edge_map: Tensor
+    edge2edge_edge_index: Tensor
     # node2edge_map: Tensor
     
-    edge2cycle_map: Tensor
+    edge2cycle_edge_index: Tensor
     cycle_attr: Tensor
 
     cycle2edge_msg_ind: Tensor
@@ -159,5 +159,3 @@ class MultiScaleData(Data):
                 return torch.tensor(1)
         else:
             return super().__inc__(key, value, *args, **kwargs)
-    def __cat_dim__(self, key: str, value: Any, *args, **kwargs) -> Any:
-        return super().__cat_dim__(key, value, *args, **kwargs)
