@@ -34,7 +34,10 @@ parser.add_argument('--force_use_cpu',action='store_true')
 args = parser.parse_args()
 
 ds_path = 'data/ZINC'
-run_path = get_run_path('runs')
+if __name__ == '__main__':
+    run_path = get_run_path('runs')
+else:
+    run_path = get_run_path('runs',True)
 overview_log_path = f"{run_path}/summary.log"
 with open(overview_log_path,'w') as file:
     intital_info = {

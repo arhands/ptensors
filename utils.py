@@ -4,7 +4,7 @@ from torch import Tensor
 from typing import Literal, TypeAlias, Union, List, Tuple, Dict
 import os
 
-def get_run_path(base_dir: str = 'logs', use_last_path: bool) -> str:
+def get_run_path(base_dir: str = 'logs', use_last_path: bool = False) -> str:
     if not os.path.exists(base_dir):
         os.mkdir(base_dir)
         run_id = 0
