@@ -34,7 +34,7 @@ class ModelHandler(pl.LightningModule):
     def test_step(self, batch: Batch, batch_idx: int):
         self.test_score_fn(self(batch),batch.y.flatten())
     def on_validation_epoch_end(self) -> None:
-        self.log('val_score',self.valid_score_fn,on_epoch=True)
+        self.log('val_score',self.valid_score_fn,on_epoch=True,prog_bar=True)
     def on_test_epoch_end(self) -> None:
         self.log('test_score',self.test_score_fn,on_epoch=True)
 
