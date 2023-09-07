@@ -105,7 +105,7 @@ class SplitLayer(Module):
         node2edge_val = node_rep[node2edge_index[0]]
         node2edge_msg = torch.cat([node2edge_val,edge_rep[node2edge_index[1]]],-1)
         node2edge_msg = self.lvl_mlp_1(node2edge_msg)
-        cat_edge_rep = scatter_sum(torch.cat([self.lvl_mlp_1(node2edge_msg),node2edge_val],-1),node2edge_index[1],0,dim_size=len(edge_rep))
+        cat_edge_rep = scatter_sum(torch.cat([node2edge_msg,node2edge_val],-1),node2edge_index[1],0,dim_size=len(edge_rep))
 
         lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
         
