@@ -6,6 +6,10 @@ import torch
 from torch import Tensor
 from objects import TransferData1, MultiScaleData, atomspack1
 from induced_cycle_finder import get_induced_cycles, from_edge_index
+from torch_scatter import scatter_sum
+
+def _get_cycle_attr(data: Data, cycles: atomspack1):
+    return scatter_sum(torch.nn.functional.one_hot(data.x,22)[cycles.atoms],cycles.domain_indicator,0,dim_size=cycles.num_domains)
 
 class PreprocessTransform(BaseTransform):
     def __call__(self, data_: Data) -> MultiScaleData:
@@ -64,7 +68,7 @@ class PreprocessTransform(BaseTransform):
             # TODO: figure out better features for cycles.
             
             node_counts = torch.tensor([len(c) for c in cycles])
-            edge_attr_cycle = node_counts
+            edge_attr_cycle = _get_cycle_attr(data,cycles_ap)
             edge_counts_squared = edge_counts**2
             
             edge_pair_cycle_indicator = torch.arange(len(cycles)).repeat_interleave(edge_counts_squared) # needed for mapping cycles to cycle-edge pairs.

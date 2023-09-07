@@ -1,6 +1,6 @@
 from __future__ import annotations
 import torch
-from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, ModuleList
+from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, EmbeddingBag, ModuleList
 from torch import Tensor
 from typing import Literal, NamedTuple, Union, Optional, Tuple
 from torch_geometric.data import Data
@@ -22,7 +22,7 @@ def get_node_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
 
 def get_cycle_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
-        return Embedding(19,hidden_dim)
+        return EmbeddingBag(22,hidden_dim,mode='sum')
     else: 
         raise NameError(f'Dataset {ds} unknown.')
 
