@@ -127,29 +127,21 @@ class MultiTransferData1:
 
 
 class MultiScaleData(Data):
-    edge2node_msg_ind: Tensor
-
-    edge2edge_edge_index: Tensor
-    # node2edge_map: Tensor
-    
-    edge2cycle_edge_index: Tensor
-    cycle_attr: Tensor
-
-    cycle2edge_msg_ind: Tensor
-    r"""pass in a cycle/edge pair index and get back a cycle index."""
+    node2edge_index: Tensor
+    edge2cycle_index: Tensor
 
     edge_batch: Tensor
     cycle_batch: Tensor
 
+    cycle_attr: Tensor
+
     num_cycles: int
 
     def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
-        if key in ['edge2node_msg_ind','edge2edge_edge_index']:
-            return torch.tensor(len(self.edge_attr))
-        elif key == 'edge2cycle_edge_index':
+        if key == 'node2edge_index':
+            return torch.tensor([[self.num_nodes],[len(self.edge_attr)]])
+        elif key == 'edge2cycle_index':
             return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
-        elif key == 'cycle2edge_msg_ind':
-            return torch.tensor(self.num_cycles)
         elif key == 'edge_batch':
             return value.max()
         elif key == 'cycle_batch':
