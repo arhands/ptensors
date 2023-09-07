@@ -28,8 +28,8 @@ class DataHandler(pl.LightningDataModule):
         }
     
     def train_dataloader(self):
-        return self._get_dataset('train',True)
+        return self._get_dataset('train')
     def test_dataloader(self):
-        return self._get_dataset('test',False)
+        return self._get_dataset('test')
     def val_dataloader(self):
-        return self._get_dataset('val',False)
+        return self._get_dataset('val')
