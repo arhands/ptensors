@@ -9,7 +9,7 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: float) -> Trainer:
     callbacks = [
         ModelCheckpoint(root_dir + '/checkpoints/',monitor='val_score',mode=mode,save_top_k=1),
         ModelSummary(4),
-        TQDMProgressBar(refresh_rate=100),
+        TQDMProgressBar(refresh_rate=10),
         LearningRateMonitor("epoch"),
         EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr)
     ]
