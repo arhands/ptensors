@@ -29,20 +29,18 @@ class PreprocessTransform(BaseTransform):
         data.edge_attr = data.edge_attr
         del data.edge_index
         data.edge_attr = data.edge_attr[edge_mask]
-        # an indicator for mapping features to node->node messages.
+
         num_edges = len(data.edge_attr)
         edges = atomspack1(inc_edge_index.transpose(1,0).flatten(),torch.arange(inc_edge_index.size(1)).repeat_interleave(2),inc_edge_index.size(1))
         data.node2edge_index = torch.stack([
             edges.atoms,
             edges.domain_indicator
-        ],-1)
+        ])
         data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
-
         # getting cycle related maps
         cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
         data.num_cycles = len(cycles)
 
-        data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
         if len(cycles) > 0:
 
             cycles = [c.to_list() for c in cycles]
