@@ -65,7 +65,7 @@ class PreprocessTransform(BaseTransform):
             # computing indicator for cycle size
             # TODO: figure out better features for cycles.
             
-            node_counts = torch.tensor([len(c) for c in cycles])
+            # node_counts = torch.tensor([len(c) for c in cycles])
             edge_attr_cycle = _get_cycle_attr(data,cycles_ap)
             edge_counts_squared = edge_counts**2
             
