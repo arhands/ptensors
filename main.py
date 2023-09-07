@@ -1,11 +1,7 @@
 from model import Net
 # from model_gine_2 import Net
-from train import train, test
-from loader import get_dataloader
 from torch.cuda import is_available
 from argparse import ArgumentParser
-import pandas
-from matplotlib import pyplot as plt
 from datetime import datetime
 from utils import get_run_path
 from model_handler import ModelHandler
