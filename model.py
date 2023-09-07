@@ -2,7 +2,7 @@ from __future__ import annotations
 import torch
 from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, EmbeddingBag, ModuleList
 from torch import Tensor
-from typing import Literal, NamedTuple, Union, Optional, Tuple
+from typing import List, Literal, NamedTuple, Union, Optional, Tuple
 from torch_geometric.data import Data
 from torch_geometric.nn import global_add_pool, GINEConv, GINConv
 from torch_scatter import scatter_sum
@@ -60,12 +60,12 @@ class LiftLayer(Module):
             ReLU(True)
         )
         self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
-    def forward(self, node_rep: Tensor, edge_index: Tensor, edge_rep: Tensor) -> Tensor:
+    def forward(self, node_rep: Tensor, edge_index: Union[Tensor,List[Tensor]], edge_rep: Tensor) -> Tensor:
         x = node_rep[edge_index[0]]
         if len(edge_index) > 1:
             x = scatter_sum(x,edge_index[1],0,dim_size=edge_rep.size(0))
         ident = (1 + self.epsilon)*edge_rep
-        print(node_rep.size(),edge_rep.size(),x.size(),edge_index.size(),ident.size())
+        # print(node_rep.size(),edge_rep.size(),x.size(),edge_index.size(),ident.size())
         raw = x + ident
         return self.mlp(raw)
 
@@ -87,7 +87,7 @@ class ModelLayer(Module):
         node_out = self.lvl_node(node_rep,data.edge_index,edge_rep)
 
         edge_out_1 = self.lvl_edge(edge_rep,data.edge2edge_edge_index,cycle_rep[data.cycle2edge_msg_ind])
-        edge_out_2 = self.lft_edge(node_rep,data.edge_index[0],edge_rep)
+        edge_out_2 = self.lft_edge(node_rep,[data.edge_index[0]],edge_rep)
         edge_out = self.mlp(torch.cat([edge_out_1,edge_out_2],-1))
         
         cycle_out = self.lft_cycle(edge_rep,data.edge2cycle_edge_index,cycle_rep)
