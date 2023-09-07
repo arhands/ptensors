@@ -37,7 +37,8 @@ args = parser.parse_args()
 ds_path = 'data/ZINC'
 if args.run_path is None:
     run_path = get_run_path('runs')
-    
+else:
+    run_path = args.run_path
 
 
 overview_log_path = f"{run_path}/summary.log"
