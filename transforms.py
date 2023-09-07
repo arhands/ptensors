@@ -38,7 +38,7 @@ class PreprocessTransform(BaseTransform):
 
         if len(cycles) > 0:
 
-            edges = atomspack1(edge_index.transpose(1,0).flatten(),torch.arange(edge_index.size(1)),edge_index.size(1))
+            edges = atomspack1(edge_index.transpose(1,0).flatten(),torch.arange(edge_index.size(1)).repeat_interleave(2),edge_index.size(1))
             cycles = [c.to_list() for c in cycles]
             cycles_ap = atomspack1.from_list(cycles)
 
