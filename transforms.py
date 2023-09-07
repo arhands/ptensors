@@ -17,19 +17,17 @@ class PreprocessTransform(BaseTransform):
         data.__dict__.update(data_.__dict__)
         
         data.x = data.x.flatten()
+        data.y = data.y.flatten().view(-1,1)
         data.edge_attr = data.edge_attr.flatten()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
         # first, we compute maps between edges and nodes.
         # NOTE: we assume graph is simple and undirected.
-        increasing_edge_mask = data.edge_index[0] <= data.edge_index[1]
-        data.edge_attr = data.edge_attr[increasing_edge_mask]
-        increasing_edge_index : Tensor = data.edge_index[:,increasing_edge_mask]
-        edge_index = torch.cat([increasing_edge_index,increasing_edge_index.flip(0)],-1)
+        data.edge_attr = data.edge_attr
 
         # an indicator for mapping features to node->node messages.
-        num_edges = increasing_edge_index.size(1)
+        num_edges = len(data.edge_attr)
         data.edge2node_msg_ind = torch.arange(num_edges).tile(2)
 
         data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
@@ -40,7 +38,7 @@ class PreprocessTransform(BaseTransform):
 
         if len(cycles) > 0:
 
-            edges = atomspack1(increasing_edge_index.transpose(1,0).flatten(),torch.arange(increasing_edge_index.size(1)).repeat_interleave(2),increasing_edge_index.size(1))
+            edges = atomspack1(edge_index.transpose(1,0).flatten(),torch.arange(edge_index.size(1)),edge_index.size(1))
             cycles = [c.to_list() for c in cycles]
             cycles_ap = atomspack1.from_list(cycles)
 
