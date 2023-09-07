@@ -61,6 +61,7 @@ class LiftLayer(Module):
         )
         self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
     def forward(self, node_rep: Tensor, edge_index: Tensor, edge_rep: Tensor) -> Tensor:
+        print(node_rep.size(),edge_rep.size())
         x = node_rep[edge_index[0]]
         if len(edge_index) > 1:
             x = scatter_sum(x,edge_index[1],0,dim_size=edge_rep.size(0))
