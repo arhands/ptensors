@@ -17,8 +17,8 @@ filterwarnings("ignore",category=DeprecationWarning)
 filterwarnings("ignore",category=UserWarning)
 
 parser = ArgumentParser()
-parser.add_argument('--hidden_channels',type=int,default=48)
-parser.add_argument('--num_layers',type=int,default=2)
+parser.add_argument('--hidden_channels',type=int,default=128)
+parser.add_argument('--num_layers',type=int,default=4)
 parser.add_argument('--residual',action='store_true')
 parser.add_argument('--dropout',type=float,default=0.)
 
@@ -29,15 +29,16 @@ parser.add_argument('--min_lr',type=float,default=1E-5)
 parser.add_argument('--train_batch_size',type=int,default=128)
 
 parser.add_argument('--eval_batch_size',type=int,default=512)
+parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
 
 args = parser.parse_args()
 
 ds_path = 'data/ZINC'
-if __name__ == '__main__':
-    run_path = get_run_path('runs')
-else:
-    run_path = get_run_path('runs',True)
+if args.run_path is None:
+    run_path = get_run_path('runs',args.run_id)
+
+
 overview_log_path = f"{run_path}/summary.log"
 with open(overview_log_path,'w') as file:
     intital_info = {

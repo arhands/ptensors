@@ -61,9 +61,11 @@ class LiftLayer(Module):
         )
         self.epsilon = Parameter(torch.tensor(0.),requires_grad=True)
     def forward(self, node_rep: Tensor, edge_index: Tensor, edge_rep: Tensor) -> Tensor:
-        agg = scatter_sum(node_rep[edge_index[0]],edge_index[1],0,dim_size=edge_rep.size(0))
+        x = node_rep[edge_index[0]]
+        if len(edge_index) > 1:
+            x = scatter_sum(x,edge_index[1],0,dim_size=edge_rep.size(0))
         ident = (1 + self.epsilon)*edge_rep
-        raw = agg + ident
+        raw = x + ident
         return self.mlp(raw)
 
 class ModelLayer(Module):
@@ -81,7 +83,7 @@ class ModelLayer(Module):
         )
         
     def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
-        node_out = self.lvl_node(node_rep,data.edge_index,edge_rep[data.edge2node_msg_ind])
+        node_out = self.lvl_node(node_rep,data.edge_index,edge_rep)
 
         edge_out_1 = self.lvl_edge(edge_rep,data.edge2edge_edge_index,cycle_rep[data.cycle2edge_msg_ind])
         edge_out_2 = self.lft_edge(node_rep,[data.edge_index[0],data.edge2node_msg_ind],edge_rep)
