@@ -8,34 +8,6 @@ from torch_geometric.nn import global_add_pool, GINEConv, GINConv
 from torch_scatter import scatter_sum
 from objects import MultiScaleData
 
-def get_mlp(in_channels: int, dropout: float, bias: bool = True, final_linear: bool = True, out_channels: Optional[int] = None, hidden_channels : Optional[int] = None):
-    assert 0 <= dropout < 1, 'Dropout must fall in the interval [0,1).'
-    if out_channels is None:
-        out_channels = in_channels
-    if hidden_channels is None:
-        hidden_channels = 2 * out_channels
-    layers = [
-        Linear(in_channels,hidden_channels,False),
-        BatchNorm1d(hidden_channels),
-        ReLU(True),
-    ]
-    if final_linear:
-        layers.extend([
-            Linear(hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
-            ReLU(True),
-            Linear(hidden_channels,out_channels,bias),
-        ])
-    else:
-        layers.extend([
-            Linear(hidden_channels,out_channels,False),
-            BatchNorm1d(out_channels),
-            ReLU(True),
-        ])
-    if dropout > 0:
-        layers.append(Dropout(dropout))
-    return Sequential(*layers)
-
 def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
         return Embedding(4,hidden_dim)
@@ -99,7 +71,7 @@ class ModelLayer(Module):
         super().__init__()
         self.lvl_node = LevelConv(hidden_channels)
         self.lvl_edge = LevelConv(hidden_channels)
-        self.lvl_cycle = LevelConv(hidden_channels)
+        # self.lvl_cycle = LevelConv(hidden_channels)
         self.lft_edge = LiftLayer(hidden_channels)
         self.lft_cycle = LiftLayer(hidden_channels)
         self.mlp = Sequential(
