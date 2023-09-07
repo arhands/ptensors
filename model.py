@@ -86,7 +86,7 @@ class ModelLayer(Module):
         node_out = self.lvl_node(node_rep,data.edge_index,edge_rep)
 
         edge_out_1 = self.lvl_edge(edge_rep,data.edge2edge_edge_index,cycle_rep[data.cycle2edge_msg_ind])
-        edge_out_2 = self.lft_edge(node_rep,[data.edge_index[0],data.edge2node_msg_ind],edge_rep)
+        edge_out_2 = self.lft_edge(node_rep,data.edge_index[0],edge_rep)
         edge_out = self.mlp(torch.cat([edge_out_1,edge_out_2],-1))
         
         cycle_out = self.lft_cycle(edge_rep,data.edge2cycle_edge_index,cycle_rep)
