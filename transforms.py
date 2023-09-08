@@ -17,7 +17,7 @@ class PreprocessTransform(BaseTransform):
         data.__dict__.update(data_.__dict__)
         
         data.x = data.x.flatten()
-        data.y = data.y.flatten().view(-1,1)
+        data.y = data.y.flatten()
         data.edge_attr = data.edge_attr.flatten()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
