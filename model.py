@@ -112,7 +112,7 @@ class SplitLayer(Module):
         lvl_aggr_edge = lvl_aggr_edge[node2edge_index[1]] # broadcasting back to node-edge pairs
         lvl_aggr_edge = lvl_aggr_edge - node2edge_msg # removing self-messages
         
-        lvl_aggr = scatter_sum(lvl_aggr_edge[node2edge_index[1]],node2edge_index[0],0,dim_size=len(node_rep))
+        lvl_aggr = scatter_sum(lvl_aggr_edge,node2edge_index[0],0,dim_size=len(node_rep))
 
         node_out = self.lvl_mlp_2((1 + self.epsilon1) * lvl_aggr)
         edge_out = self.lift_mlp((1 + self.epsilon2) * edge_rep + lift_aggr)
