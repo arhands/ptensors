@@ -7,3 +7,4 @@ runs
 __pycache__/objects.cpython-310.pyc
 tmp/
 himp-gnn-master/data/
+train/

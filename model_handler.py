@@ -25,7 +25,7 @@ class ModelHandler(pl.LightningModule):
     def training_step(self, batch: Batch, batch_idx: int):
         pred = self(batch)
         loss = self.loss_fn(pred,batch.y.flatten())
-        self.log('train_loss',loss,True,batch_size=batch.num_graphs,on_step=True,on_epoch=True)
+        self.log('train_loss',loss,True,batch_size=batch.num_graphs,on_step=False,on_epoch=True)
         return loss
     def on_train_start(self) -> None:
         self.log('lr-Adam',self.lr)
