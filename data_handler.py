@@ -17,7 +17,7 @@ class DataHandler(pl.LightningDataModule):
         }
     def prepare_data(self) -> None:
         for split in ['train','val','test']:
-            ZINC(split,True,split,pre_transform=self.transform)
+            ZINC(self.root,split,True,split,pre_transform=self.transform)
         # return super().prepare_data()
     def _get_dataset(self, split: Literal['train','val','test']):
         return DataLoader(self.splits[split],self.batch_size[split],num_workers=4,pin_memory=True,pin_memory_device=self.device,prefetch_factor=3)
