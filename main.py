@@ -8,9 +8,9 @@ from model_handler import ModelHandler
 from data_handler import DataHandler
 from train_handler import get_trainer
 
-from warnings import filterwarnings
-filterwarnings("ignore",category=DeprecationWarning)
-filterwarnings("ignore",category=UserWarning)
+# from warnings import filterwarnings
+# filterwarnings("ignore",category=DeprecationWarning)
+# filterwarnings("ignore",category=UserWarning)
 
 parser = ArgumentParser()
 parser.add_argument('--hidden_channels',type=int,default=128)
