@@ -49,18 +49,16 @@ class PreprocessTransform(BaseTransform):
             
             edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap)
             data.edge2cycle_index = edges_to_cycles.domain_map_edge_index
-
-            edge_attr_cycle = _get_cycle_attr(data,cycles_ap)
-
-            data.cycle_attr = edge_attr_cycle
             
             data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
             
+            data.cycle_ind = cycles_ap.domain_indicator
         else:
             
             data.edge2cycle_index = torch.empty(2,0,dtype=torch.int64)
 
             data.cycle_attr = torch.empty(0,dtype=torch.int64)
+            data.cycle_ind = torch.empty(0,dtype=torch.int64)
             
             data.cycle_batch = torch.zeros(0,dtype=torch.int64)
 

@@ -133,6 +133,8 @@ class MultiScaleData(Data):
     edge_batch: Tensor
     cycle_batch: Tensor
 
+    cycle_ind: Tensor
+
     cycle_attr: Tensor
 
     num_cycles: int

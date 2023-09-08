@@ -20,12 +20,13 @@ def get_node_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     else: 
         raise NameError(f'Dataset {ds} unknown.')
 
-def get_cycle_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
-    if ds == 'ZINC':
-        return EmbeddingBag(22,hidden_dim,mode='sum')
-    else: 
-        raise NameError(f'Dataset {ds} unknown.')
-
+class CycleEmbedding(Module):
+    def __init__(self, hidden_dim: int) -> None:
+        super().__init__()
+        self.emb = Embedding(22,hidden_dim)
+    def forward(self, x: Tensor, cycle_ind: Tensor):
+        x = self.emb(x)
+        return scatter_sum(x,cycle_ind,0)
 class LevelConv(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
@@ -144,7 +145,7 @@ class Net(Module):
         # Initialization layers
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
         self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
-        self.cycle_encoder = get_cycle_encoder(hidden_dim,dataset)
+        self.cycle_encoder = CycleEmbedding(hidden_dim)
 
         # convolutional layers
         self.layers = ModuleList(ModelLayer(hidden_dim) for _ in range(num_layers))
@@ -159,7 +160,7 @@ class Net(Module):
         # initializing model
         node_rep = self.atom_encoder(data.x)
         edge_rep = self.edge_encoder(data.edge_attr)
-        cycle_rep = self.cycle_encoder(data.cycle_attr)
+        cycle_rep = self.cycle_encoder(data.cycle_attr,data.cycle_ind)
 
         # performing message passing
         for layer in self.layers:
