@@ -160,7 +160,7 @@ class Net(Module):
         # initializing model
         node_rep = self.atom_encoder(data.x)
         edge_rep = self.edge_encoder(data.edge_attr)
-        cycle_rep = self.cycle_encoder(data.cycle_attr,data.cycle_ind)
+        cycle_rep = self.cycle_encoder(data.x,data.cycle_ind)
 
         # performing message passing
         for layer in self.layers:

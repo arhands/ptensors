@@ -144,6 +144,8 @@ class MultiScaleData(Data):
             return torch.tensor([[self.num_nodes],[len(self.edge_attr)]])
         elif key == 'edge2cycle_index':
             return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
+        elif key == 'cycle_ind':
+            return self.num_nodes
         elif key == 'edge_batch':
             return value.max()
         elif key == 'cycle_batch':
