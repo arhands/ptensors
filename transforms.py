@@ -56,9 +56,9 @@ class PreprocessTransform(BaseTransform):
         else:
             
             data.edge2cycle_index = torch.empty(2,0,dtype=torch.int64)
+            data.node2cycle_index = torch.empty(2,0,dtype=torch.int64)
 
             data.cycle_attr = torch.empty(0,dtype=torch.int64)
-            data.cycle_ind = torch.empty(0,dtype=torch.int64)
             
             data.cycle_batch = torch.zeros(0,dtype=torch.int64)
 
