@@ -24,9 +24,9 @@ class CycleEmbedding(Module):
     def __init__(self, hidden_dim: int) -> None:
         super().__init__()
         self.emb = Embedding(22,hidden_dim)
-    def forward(self, x: Tensor, cycle_ind: Tensor):
+    def forward(self, x: Tensor, atom_to_cycle: Tensor):
         x = self.emb(x)
-        return scatter_sum(x,cycle_ind,0)
+        return scatter_sum(x[atom_to_cycle[0]],atom_to_cycle[1],0)
 class LevelConv(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
@@ -160,7 +160,7 @@ class Net(Module):
         # initializing model
         node_rep = self.atom_encoder(data.x)
         edge_rep = self.edge_encoder(data.edge_attr)
-        cycle_rep = self.cycle_encoder(data.x,data.cycle_ind)
+        cycle_rep = self.cycle_encoder(data.x,data.node2cycle_index)
 
         # performing message passing
         for layer in self.layers:

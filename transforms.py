@@ -52,7 +52,7 @@ class PreprocessTransform(BaseTransform):
             
             data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
             
-            data.cycle_ind = cycles_ap.domain_indicator
+            data.node2cycle_index = torch.stack([cycles_ap.atoms,cycles_ap.domain_indicator])
         else:
             
             data.edge2cycle_index = torch.empty(2,0,dtype=torch.int64)

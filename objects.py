@@ -129,6 +129,7 @@ class MultiTransferData1:
 class MultiScaleData(Data):
     node2edge_index: Tensor
     edge2cycle_index: Tensor
+    node2cycle_index: Tensor
 
     edge_batch: Tensor
     cycle_batch: Tensor
@@ -144,6 +145,8 @@ class MultiScaleData(Data):
             return torch.tensor([[self.num_nodes],[len(self.edge_attr)]])
         elif key == 'edge2cycle_index':
             return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
+        elif key == 'node2cycle_index':
+            return torch.tensor([[self.num_nodes],[self.num_cycles]])
         elif key == 'cycle_ind':
             return self.num_nodes
         elif key == 'edge_batch':
