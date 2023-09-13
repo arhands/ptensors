@@ -1,4 +1,4 @@
-from model import Net
+from model_3 import Net
 # from model_gine_2 import Net
 from torch.cuda import is_available
 from argparse import ArgumentParser
@@ -7,6 +7,7 @@ from utils import get_run_path
 from model_handler import ModelHandler
 from data_handler import DataHandler
 from train_handler import get_trainer
+import os
 
 # from warnings import filterwarnings
 # filterwarnings("ignore",category=DeprecationWarning)
@@ -30,11 +31,19 @@ parser.add_argument('--force_use_cpu',action='store_true')
 
 args = parser.parse_args()
 
+def ensure_exists(path: str):
+    base = ''
+    for segment in path.split('/'):
+        base = f'{base}{segment}/'
+        if not os.path.exists(base):
+            os.mkdir(base)
+
 ds_path = 'data/ZINC'
 if args.run_path is None:
     run_path = get_run_path('runs')
 else:
     run_path = args.run_path
+    ensure_exists(run_path)
 
 
 overview_log_path = f"{run_path}/summary.log"

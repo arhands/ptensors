@@ -23,8 +23,12 @@ class atomspack1(NamedTuple):
     
     @classmethod
     def from_list(cls, ls: list[list[int]]):
-        atoms = torch.cat([torch.tensor(v) for v in ls])
-        domain_indicator = torch.cat([torch.tensor([idx]).broadcast_to(len(v)) for idx, v in enumerate(ls)])
+        if len(ls) > 0:
+            atoms = torch.cat([torch.tensor(v) for v in ls])
+            domain_indicator = torch.cat([torch.tensor([idx]).broadcast_to(len(v)) for idx, v in enumerate(ls)])
+        else:
+            atoms = torch.empty(0,dtype=torch.int64)
+            domain_indicator = torch.empty(0,dtype=torch.int64)
         return cls(atoms,domain_indicator,len(ls))
     
     def __str__(self) -> str:
@@ -95,7 +99,17 @@ class TransferData1(TransferData0):
         
         # 'intersect_indicator' represents the map from the source/target tensors to the intersections.
         domain_overlaps_edge_index, intersect_indicator = torch.stack([source_domains,target_domains]).unique(dim=1,return_inverse=True)
-        num_nodes = max(source.atoms.max().item(),target.atoms.max().item()) + 1
+
+        if source.num_domains > 0:
+            num_nodes = source.atoms.max().item()
+        else:
+            num_nodes = 0
+
+        if target.num_domains > 0:
+            num_nodes = max(num_nodes,target.atoms.max().item())
+        
+        num_nodes += 1
+
         return cls(
             source,
             target,
@@ -158,3 +172,89 @@ class MultiScaleData(Data):
                 return torch.tensor(1)
         else:
             return super().__inc__(key, value, *args, **kwargs)
+
+class MultiScaleData_2(Data):
+    node2edge_index: Tensor
+    node2cycle_index: Tensor
+
+    edge_batch: Tensor
+    cycle_batch: Tensor
+    
+    # transfer data
+    edge_atoms: Tensor
+    edge_domain_indicator: Tensor
+    num_edges: int
+
+    num_cycles: int
+    cycle_atoms: Tensor
+    cycle_domain_indicator: Tensor
+    
+    edge2cycle_domain_map_edge_index: Tensor
+    edge2cycle_node_map_edge_index: Tensor
+    edge2cycle_intersect_indicator: Tensor
+    edge2cycle_num_intersections: int
+
+    def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
+        if key == 'node2edge_index':
+            return torch.tensor([[self.num_nodes],[len(self.edge_attr)]])
+        elif 'atoms' in key:
+            return self.num_nodes
+        elif key == 'edge_domain_indicator':
+            return self.num_edges
+        elif key == 'cycle_domain_indicator':
+            return self.num_cycles
+        elif key == 'edge2cycle_index':
+            return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
+        elif key == 'edge2cycle_domain_map_edge_index':
+            return torch.tensor([[self.num_edges],[self.num_cycles]])
+        elif key == 'edge2cycle_node_map_edge_index':
+            return torch.tensor([[len(self.edge_atoms)],[len(self.cycle_atoms)]])
+        elif key == 'cycle_ind':
+            return self.num_nodes
+        elif key == 'edge_batch':
+            return value.max()
+        elif key == 'cycle_batch':
+            if len(value) > 0:
+                return value.max()
+            else:
+                return torch.tensor(1)
+        else:
+            return super().__inc__(key, value, *args, **kwargs)
+    
+    def set_edge2cycle(self, edge2cycle: TransferData1):
+        edges = edge2cycle.source
+        cycles = edge2cycle.target
+        self.num_cycles = cycles.num_domains
+        self.cycle_atoms = cycles.atoms
+        self.cycle_domain_indicator = cycles.domain_indicator
+        
+        self.num_edges = edges.num_domains
+        self.edge_atoms = edges.atoms
+        self.edge_domain_indicator = edges.domain_indicator
+        
+        self.edge2cycle_domain_map_edge_index = edge2cycle.domain_map_edge_index
+        self.edge2cycle_node_map_edge_index = edge2cycle.node_map_edge_index
+        self.edge2cycle_intersect_indicator = edge2cycle.intersect_indicator
+        self.edge2cycle_num_intersections = edge2cycle.domain_map_edge_index.size(1)
+
+        self.cycle_batch = torch.zeros(cycles.num_domains,dtype=torch.int64)
+    
+    def get_edge2cycle(self):
+        num_edges = torch.sum(self.num_edges).item()
+        num_cycles = torch.sum(self.num_cycles).item()
+        return TransferData1(
+            source=atomspack1(
+                atoms = self.edge_atoms,
+                domain_indicator = self.edge_domain_indicator,
+                num_domains = num_edges
+            ),
+            target=atomspack1(
+                atoms = self.cycle_atoms,
+                domain_indicator = self.cycle_domain_indicator,
+                num_domains = num_cycles
+            ),
+            domain_map_edge_index=self.edge2cycle_domain_map_edge_index,
+            node_map_edge_index=self.edge2cycle_node_map_edge_index,
+            intersect_indicator=self.edge2cycle_intersect_indicator,
+            num_nodes=self.num_nodes,
+        )

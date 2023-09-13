@@ -1,17 +1,17 @@
 # based on https://arxiv.org/pdf/1408.1265.pdf
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 from torch import Tensor
 from cycle_finder import LinkedList
 import numpy as np 
 
-def _remove_node(idx: int, neighbors: np.ndarray[Any,list[int]]):
+def _remove_node(idx: int, neighbors: np.ndarray):
     for n in neighbors[idx]:
         neighbors[n].remove(idx)
     
     neighbors[idx] = []
 
-def from_edge_index(edge_index: Tensor, num_nodes: int) -> np.ndarray[Any,list[int]]:
+def from_edge_index(edge_index: Tensor, num_nodes: int) -> np.ndarray:
     neighbors = np.array([[] for _ in range(num_nodes)],dtype=object)
     neighbors = np.empty(num_nodes,dtype=object)
     for i in range(num_nodes):
@@ -21,7 +21,7 @@ def from_edge_index(edge_index: Tensor, num_nodes: int) -> np.ndarray[Any,list[i
     return neighbors
 
 # NOTE: we should replace this with a spanning tree.
-def _get_shortest_path(a: int, b: int, neighbors: np.ndarray[Any,list[int]], active: Optional[np.ndarray[Any,list[int]]] = None) -> Union[LinkedList[int],None]:
+def _get_shortest_path(a: int, b: int, neighbors: np.ndarray, active: Optional[np.ndarray] = None) -> Union[LinkedList[int],None]:
     unvisited = active.copy() if active is not None else np.ones(neighbors.shape[0],dtype=bool)
     queue = [LinkedList[int](None,a)]
     unvisited[a] = False
@@ -34,7 +34,7 @@ def _get_shortest_path(a: int, b: int, neighbors: np.ndarray[Any,list[int]], act
         queue.extend([LinkedList[int](path,v) for v in unvisited_neighbors])
     return None
 
-def list_induced_paths(s: int, t: int, pi_su: LinkedList[int], u: int, pi_ut: LinkedList[int], neighbors: np.ndarray[Any,list[int]], active_nodes: np.ndarray[Any,bool]) -> list[LinkedList[int]]:
+def list_induced_paths(s: int, t: int, pi_su: LinkedList[int], u: int, pi_ut: LinkedList[int], neighbors: np.ndarray, active_nodes: np.ndarray) -> List[LinkedList[int]]:
     assert all(active_nodes[v] for v in pi_ut.to_list())
     # active_nodes = np.ones(neighbors.shape[0],dtype=bool)
     if u == t:
@@ -70,7 +70,7 @@ def list_induced_paths(s: int, t: int, pi_su: LinkedList[int], u: int, pi_ut: Li
         active_nodes[[v for v, _ in S]] = True
         return paths
 
-def get_induced_cycles(neighbors: np.ndarray[Any,list[int]]) -> list[LinkedList[int]]:
+def get_induced_cycles(neighbors: np.ndarray[Any,List[int]]) -> List[LinkedList[int]]:
     r"""
     NOTE: we assume the graph is undirected.
     """

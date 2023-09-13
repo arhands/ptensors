@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 class ModelHandler(pl.LightningModule):
     def __init__(self, model: Module, lr: float, lr_patience: int) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        # self.save_hyperparameters()
         self.model = model
         self.loss_fn = L1Loss()
         self.valid_score_fn = MeanAbsoluteError()
