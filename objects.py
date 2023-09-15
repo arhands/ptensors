@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional, Union
 import torch
 from torch import Tensor
 from torch_geometric.data import Data
@@ -164,10 +164,10 @@ class MultiScaleData(Data):
         elif key == 'cycle_ind':
             return self.num_nodes
         elif key == 'edge_batch':
-            return value.max()
+            return value.max() + 1
         elif key == 'cycle_batch':
             if len(value) > 0:
-                return value.max()
+                return value.max() + 1
             else:
                 return torch.tensor(1)
         else:
@@ -183,39 +183,46 @@ class MultiScaleData_2(Data):
     # transfer data
     edge_atoms: Tensor
     edge_domain_indicator: Tensor
-    num_edges: int
+    num_edges: Union[int,Tensor]
 
-    num_cycles: int
+    num_cycles: Union[int,Tensor]
     cycle_atoms: Tensor
     cycle_domain_indicator: Tensor
     
     edge2cycle_domain_map_edge_index: Tensor
     edge2cycle_node_map_edge_index: Tensor
     edge2cycle_intersect_indicator: Tensor
-    edge2cycle_num_intersections: int
+    edge2cycle_num_intersections: Union[int,Tensor]
+    
+    def _get_num_cycles(self):
+        if isinstance(self.num_cycles,int):
+            return self.num_cycles
+        return self.num_cycles.sum()
+    def _get_num_edges(self):
+        return len(self.edge_attr)
+    def _get_edge2cycle_num_intersections(self):
+        return self.edge2cycle_domain_map_edge_index.size(1)
 
     def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
         if key == 'node2edge_index':
-            return torch.tensor([[self.num_nodes],[len(self.edge_attr)]])
+            return torch.tensor([[self.num_nodes],[self._get_num_edges()]])
         elif 'atoms' in key:
             return self.num_nodes
         elif key == 'edge_domain_indicator':
-            return self.num_edges
+            return self._get_num_edges()
         elif key == 'cycle_domain_indicator':
-            return self.num_cycles
-        elif key == 'edge2cycle_index':
-            return torch.tensor([[len(self.edge_attr)],[self.num_cycles]])
-        elif key == 'edge2cycle_domain_map_edge_index':
-            return torch.tensor([[self.num_edges],[self.num_cycles]])
-        elif key == 'edge2cycle_node_map_edge_index':
-            return torch.tensor([[len(self.edge_atoms)],[len(self.cycle_atoms)]])
+            return self._get_num_cycles()
+        elif key in ['edge2cycle_domain_map_edge_index','edge2cycle_node_map_edge_index']:
+            return torch.tensor([[self._get_num_edges()],[self._get_num_cycles()]])
+        elif key == 'edge2cycle_intersect_indicator':
+            return self._get_edge2cycle_num_intersections()
         elif key == 'cycle_ind':
             return self.num_nodes
         elif key == 'edge_batch':
-            return value.max()
+            return self._get_num_edges()
         elif key == 'cycle_batch':
             if len(value) > 0:
-                return value.max()
+                return self._get_num_cycles()
             else:
                 return torch.tensor(1)
         else:
@@ -239,9 +246,27 @@ class MultiScaleData_2(Data):
 
         self.cycle_batch = torch.zeros(cycles.num_domains,dtype=torch.int64)
     
+    def set_edge2cycle_4(self, edge2cycle: TransferData1):
+        edges = edge2cycle.source
+        cycles = edge2cycle.target
+        self.num_cycles = cycles.num_domains
+        self.cycle_atoms = cycles.atoms
+        self.cycle_domain_indicator = cycles.domain_indicator
+        
+        self.num_edges = edges.num_domains
+        self.edge_atoms = edges.atoms
+        self.edge_domain_indicator = edges.domain_indicator
+        
+        self.edge2cycle_domain_map_edge_index = edge2cycle.domain_map_edge_index
+        self.edge2cycle_node_map_edge_index = edge2cycle.node_map_edge_index
+        self.edge2cycle_intersect_indicator = edge2cycle.intersect_indicator
+        self.edge2cycle_num_intersections = edge2cycle.domain_map_edge_index.size(1)
+
+        self.cycle_batch = torch.zeros(len(cycles.atoms),dtype=torch.int64)
+    
     def get_edge2cycle(self):
-        num_edges = torch.sum(self.num_edges).item()
-        num_cycles = torch.sum(self.num_cycles).item()
+        num_edges = self.num_edges if isinstance(self.num_edges,int) else torch.sum(self.num_edges).item()
+        num_cycles = self.num_cycles if isinstance(self.num_cycles,int) else torch.sum(self.num_cycles).item()
         return TransferData1(
             source=atomspack1(
                 atoms = self.edge_atoms,

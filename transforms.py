@@ -95,5 +95,44 @@ class PreprocessTransform_2(BaseTransform):
         cycles = atomspack1.from_list(cycles)
         edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles)
         data.set_edge2cycle(edge2cycle)
+        
+        data.num_nodes = len(data.x)
+
+        return data
+
+class PreprocessTransform_4(BaseTransform):
+    def __call__(self, data_: Data) -> MultiScaleData_2:
+        data = MultiScaleData_2()
+        data.__dict__.update(data_.__dict__)
+        
+        data.x = data.x.flatten()
+        data.y = data.y.flatten()
+        data.edge_attr = data.edge_attr.flatten()
+        edge_index : Tensor = data.edge_index
+        num_nodes : int = data.num_nodes
+
+        # first, we compute maps between edges and nodes.
+        # NOTE: we assume graph is simple and undirected.
+        edge_mask = edge_index[0] < edge_index[1]
+        inc_edge_index = edge_index[:,edge_mask]
+        data.edge_attr = data.edge_attr
+        del data.edge_index
+        data.edge_attr = data.edge_attr[edge_mask]
+
+        num_edges = len(data.edge_attr)
+        edges = atomspack1(inc_edge_index.transpose(1,0).flatten(),torch.arange(inc_edge_index.size(1)).repeat_interleave(2),inc_edge_index.size(1))
+        data.node2edge_index = torch.stack([
+            edges.atoms,
+            edges.domain_indicator
+        ])
+        data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
+        # getting cycle related maps
+        cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes))
+        data.num_cycles = len(cycles)
+        
+        cycles = [c.to_list() for c in cycles]
+        cycles = atomspack1.from_list(cycles)
+        edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles)
+        data.set_edge2cycle_4(edge2cycle)
 
         return data
