@@ -38,7 +38,7 @@ outer_loop = tqdm(['train','val','test'],total=3)
 
 for split in outer_loop:
     outer_loop.set_description_str(split)
-    ds = ZINC('./data/ZINC',True,split)
+    ds = ZINC('./data/ZINC_base',True,split)
     loop = tqdm(ds,total=len(ds),leave=False,position=1)
     for G in loop:
         neighbors = from_edge_index(G.edge_index,G.num_nodes)

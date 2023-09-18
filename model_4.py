@@ -7,8 +7,8 @@ from torch_geometric.data import Data
 from torch_geometric.nn import global_add_pool, GINEConv, GINConv
 from torch_scatter import scatter_sum
 from objects import MultiScaleData_2, TransferData1
-from ptensors1 import transfer0_1, transfer1_0, linmaps0_1, linmaps1_0
-from ptensors0 import transfer0_0
+from ptensors0 import transfer0_0_bi_msg, transfer0_0
+from ptensors1 import linmaps1_1, transfer0_1_bi_msg, transfer1_0
 
 def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
@@ -28,7 +28,7 @@ class CycleEmbedding(Module):
         self.emb = Embedding(22,hidden_dim)
     def forward(self, x: Tensor, atom_to_cycle: tuple[Tensor,Tensor]):
         x = self.emb(x)
-        return scatter_sum(x[atom_to_cycle[0]],atom_to_cycle[1],0)
+        return x[atom_to_cycle[0]]
 
 class SplitLayer(Module):
     r"""
@@ -37,10 +37,10 @@ class SplitLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -50,10 +50,10 @@ class SplitLayer(Module):
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -84,43 +84,61 @@ class EdgeCycleSplitLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
-            ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
-            ReLU(True)
-        )
-        self.lvl_mlp_1 = Sequential(
             Linear(3*hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
+            ReLU(True),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True)
         )
-        self.lvl_mlp_2 = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+        self.lvl_mlp_1_inv = Sequential(
+            Linear(3*hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
+        )
+        self.lvl_mlp_1_int = Sequential(
+            Linear(3*hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
+            ReLU(True),
+            Linear(hidden_channels,hidden_channels,False),
+        )
+        self.lift_lin_inv = Linear(hidden_channels,hidden_channels,False)
+        self.lift_lin_int = Linear(hidden_channels,hidden_channels,False)
+        self.lvl_aggr_lin = Linear(hidden_channels*2,hidden_channels,False)
+        self.lvl_mlp_2 = Sequential(
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
+            ReLU(True),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
         self.epsilon1 = Parameter(torch.tensor(0.),requires_grad=True)
-        self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
+        # self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
+        self.hidden_units = hidden_channels
     def forward(self, edge_rep: Tensor, cycle_rep: Tensor, edge2cycle: TransferData1) -> tuple[Tensor,Tensor]:
         cycle2edge = edge2cycle.reverse()
+        # TODO: add removing self messages.
+        def inv_msg_encoder(x: Tensor, y: Tensor) -> Tensor:
+            return torch.cat([
+                self.lift_lin_inv(x),
+                self.lvl_mlp_1_inv(torch.cat([x,y],-1))
+            ],-1)
+        def int_msg_encoder(x: Tensor, y: Tensor) -> Tensor:
+            return torch.cat([
+                self.lift_lin_int(x),
+                self.lvl_mlp_1_int(torch.cat([x,y],-1))
+            ],-1)
+        cat_cycle = transfer0_1_bi_msg(edge_rep,edge2cycle,int_msg_encoder,inv_msg_encoder,cycle_rep)
+        lvl_aggr_cycle, lift_aggr = cat_cycle[:,self.hidden_units:], cat_cycle[:,:self.hidden_units]
+        lvl_aggr = transfer1_0(lvl_aggr_cycle,cycle2edge)
+        lvl_aggr = self.lvl_aggr_lin(lvl_aggr)
 
-        edge2cycle_val = transfer0_1(edge_rep,edge2cycle)
-        
-        edge2cycle_msg = torch.cat([edge2cycle_val,linmaps0_1(cycle_rep,edge2cycle.target)],-1)
-        edge2cycle_msg = self.lvl_mlp_1(edge2cycle_msg)
-
-        lvl_aggr = transfer1_0(edge2cycle_msg, cycle2edge)
-        lvl_aggr = lvl_aggr[:,edge2cycle_msg.size(1):] - lvl_aggr[:,:edge2cycle_msg.size(1)] #subtracting out self messages.
 
         edge_out = self.lvl_mlp_2((1 + self.epsilon1) * edge_rep + lvl_aggr)
 
-        lift_aggr = transfer0_0(edge_rep,edge2cycle)
-        cycle_out = self.lift_mlp((1 + self.epsilon2) * cycle_rep + lift_aggr)
+        cycle_out = self.lift_mlp(torch.cat([linmaps1_1(cycle_rep,edge2cycle.target),lift_aggr],-1))
 
         return edge_out, cycle_out
 
@@ -183,11 +201,12 @@ class Net(Module):
         return self.lin(rep)
 
 """
-Testing DataLoader 0: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:00<00:00, 23.12it/s]
+Loaded model weights from the checkpoint at /home/andrew/Repos/topological_model/runs/fancy_run_2/checkpoints/epoch=242-step=19197.ckpt
+Testing DataLoader 0: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:00<00:00, 20.86it/s]
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃        Test metric        ┃       DataLoader 0        ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│        test_score         │    0.08831098675727844    │
+│        test_score         │    0.08010555803775787    │
 └───────────────────────────┴───────────────────────────┘
-Epoch 272:  89%|████████▊ | 70/79 [00:06<00:00, 10.06it/s, v_num=6, val_score=0.094, train_loss=0.067]       
+Epoch 334:  51%|█████     | 40/79 [00:05<00:05,  7.44it/s, v_num=28, val_score=0.0958, train_loss=0.0574]    
 """

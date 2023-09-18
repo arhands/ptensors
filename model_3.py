@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 from torch_geometric.nn import global_add_pool, GINEConv, GINConv
 from torch_scatter import scatter_sum
 from objects import MultiScaleData_2, TransferData1
-from ptensors0 import transfer0_0_bi_msg, transfer0_0
+from ptensors0 import transfer0_0_bi_msg, transfer0_0_msg
 
 def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
@@ -36,10 +36,10 @@ class SplitLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -49,10 +49,10 @@ class SplitLayer(Module):
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -83,23 +83,23 @@ class EdgeCycleSplitLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
         self.lvl_mlp_1 = Sequential(
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels*2,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
-            Linear(hidden_channels,2*hidden_channels,False),
-            BatchNorm1d(2*hidden_channels),
+            Linear(hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels),
             ReLU(True),
-            Linear(2*hidden_channels,hidden_channels,False),
+            Linear(hidden_channels,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -108,12 +108,14 @@ class EdgeCycleSplitLayer(Module):
     def forward(self, edge_rep: Tensor, cycle_rep: Tensor, edge2cycle: TransferData1) -> tuple[Tensor,Tensor]:
         cycle2edge = edge2cycle.reverse()
 
+        msg_dupe = [None]
         def msg_encoder(x: Tensor, y: Tensor) -> Tensor:
             msg = self.lvl_mlp_1(torch.cat([x,y],-1))
+            msg_dupe[0] = msg
             return torch.cat([x,msg],-1)
         cat_cycle = transfer0_0_bi_msg(edge_rep,edge2cycle,msg_encoder,cycle_rep)
         lvl_aggr_cycle, lift_aggr = cat_cycle[:,edge_rep.size(1):], cat_cycle[:,:edge_rep.size(1)]
-        lvl_aggr = transfer0_0(lvl_aggr_cycle,cycle2edge)
+        lvl_aggr = transfer0_0_msg(lvl_aggr_cycle,cycle2edge,lambda x: x - msg_dupe[0])# we subtract out the outgoing messages.
 
 
         edge_out = self.lvl_mlp_2((1 + self.epsilon1) * edge_rep + lvl_aggr)
@@ -154,14 +156,15 @@ class Net(Module):
         self.layers = ModuleList(ModelLayer(hidden_dim) for _ in range(num_layers))
         # finalization layers
         self.pool_mlps = ModuleList([Sequential(
-            Linear(hidden_dim,hidden_dim,False),
-            BatchNorm1d(hidden_dim),
+            Linear(hidden_dim,hidden_dim*2,False),
+            BatchNorm1d(hidden_dim*2),
             ReLU(True),
         ) for _ in range(3)])
-        self.lin = Linear(hidden_dim,1)
+        self.lin = Linear(hidden_dim*2,1)
     def forward(self, data: MultiScaleData_2) -> Tensor:
         # initializing model
         node_rep = self.atom_encoder(data.x)
+        # print(165,'node_rep.size()',node_rep.size())
         edge_rep = self.edge_encoder(data.edge_attr)
         cycle_rep = self.cycle_encoder(data.x,(data.cycle_atoms,data.cycle_domain_indicator))
 
@@ -170,12 +173,14 @@ class Net(Module):
         # performing message passing
         for layer in self.layers:
             node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,data,edge2cycle)
-        
+            # print(174,'node_rep.size()',node_rep.size())
         # finalizing model
+        # print(data.num_graphs,data.batch)
         reps = [
             global_add_pool(node_rep,data.batch,size=data.num_graphs),
             global_add_pool(edge_rep,data.edge_batch,size=data.num_graphs),
-            global_add_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
+            global_add_pool(cycle_rep,torch.arange(data.num_graphs,device=cycle_rep.device).repeat_interleave(data.num_cycles),size=data.num_graphs)
+            # global_add_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
         ]
         rep = torch.sum(torch.stack([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)]),0)
         return self.lin(rep)

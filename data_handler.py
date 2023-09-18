@@ -1,7 +1,7 @@
 from typing import Literal
 import lightning.pytorch as pl
 from torch_geometric.datasets import ZINC
-from transforms import PreprocessTransform_2 as PreprocessTransform
+from transforms import PreprocessTransform_4 as PreprocessTransform
 from torch_geometric.loader import DataLoader
 
 class DataHandler(pl.LightningDataModule):

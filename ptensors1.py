@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union
+from typing import Callable, Union
 import torch
 from torch import Tensor
 from torch_scatter import scatter
@@ -36,17 +36,39 @@ def transfer0_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
         intersection_broadcasted,
     ],-1)
 
+def transfer0_1_bi_msg(x: Tensor, data: TransferData1, encoder_int: Callable[[Tensor,Tensor],Tensor], encoder_inv: Callable[[Tensor,Tensor],Tensor], y: Tensor, reduce: Union[list[str],str]='sum'):
+    r"""
+        for transfering from a ptensors0 to a ptensors1
+    """
+    if isinstance(reduce,str):
+        reduce = [reduce]*4
+    x_inv = x[data.domain_map_edge_index[0]]
+    x_int = x_inv[data.intersect_indicator]
+
+    y_inv = scatter(y,data.target.domain_indicator,0,dim_size=data.target.num_domains,reduce=reduce[0])
+    y_inv = y_inv[data.domain_map_edge_index[1]]
+    y_int = y[data.node_map_edge_index[1]]
+    y_int_inv = scatter(y_int,data.intersect_indicator,0,reduce=reduce[1])
+
+    msg_int = encoder_int(x_int,torch.cat([y_int,y_inv[data.intersect_indicator]],-1))
+    msg_inv = encoder_inv(x_inv,torch.cat([y_inv,y_int_inv],-1))
+
+    out_int = scatter(msg_int,data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[2])
+    out_inv = scatter(msg_inv,data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[3])
+    out = out_int + out_inv[data.target.domain_indicator]
+
+    return out
+
 def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum'):
     r"""for transfering from a ptensors0 to a ptensors1"""
     if isinstance(reduce,str):
-        reduce = [reduce]*4
+        reduce = [reduce]*3
     
     domain_reduced = scatter(x,data.source.domain_indicator,0,reduce=reduce[0])
-
     domain_maps = scatter(domain_reduced[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])
 
-    node_maps = scatter(x[data.node_map_edge_index[0]],data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[2])
-    node_maps = scatter(node_maps,data.target.domain_indicator,0,dim_size=data.target.num_domains,reduce=reduce[3])
+    node_maps = scatter(x[data.node_map_edge_index[0]],data.target.domain_indicator[data.node_map_edge_index[1]],0,dim_size=data.target.num_domains,reduce=reduce[2])
+    # node_maps = scatter(node_maps,,0,dim_size=data.target.num_domains,reduce=reduce[3])
     return torch.cat([
         node_maps,
         domain_maps,

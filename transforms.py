@@ -135,4 +135,6 @@ class PreprocessTransform_4(BaseTransform):
         edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles)
         data.set_edge2cycle_4(edge2cycle)
 
+        # added for debug:
+        data.num_nodes = len(data.x)
         return data

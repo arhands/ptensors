@@ -1,7 +1,7 @@
 import os
 from lightning.pytorch.callbacks import ModelSummary
-from lightning.pytorch.loggers import CSVLogger
-from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
+from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, ModelCheckpoint
 from lightning import Trainer
 
 def get_trainer(root_dir: str, max_epochs: int, min_lr: float) -> Trainer:
@@ -10,8 +10,8 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: float) -> Trainer:
         ModelCheckpoint(root_dir + '/checkpoints/',monitor='val_score',mode=mode,save_top_k=1),
         ModelSummary(4),
         TQDMProgressBar(refresh_rate=10),
-        LearningRateMonitor("epoch"),
-        EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr)
+        # LearningRateMonitor("epoch"),
+        EarlyStopping('lr-Adam',0,max_epochs,mode="min",verbose=True,check_finite=False,stopping_threshold=min_lr)
     ]
     #if trial is not None:
     #    callbacks.append(PyTorchLightningPruningCallback(trial,'validation_score'))
@@ -26,7 +26,7 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: float) -> Trainer:
         callbacks= callbacks,
         #logger=logger,
         max_epochs=max_epochs,
-        logger=CSVLogger(root_dir),
+        logger=(CSVLogger(root_dir),TensorBoardLogger(root_dir)),
         # reload_dataloaders_every_n_epochs = 100
     )
     #trainer.early_stopping_callback = early_stop_callback # type: ignore

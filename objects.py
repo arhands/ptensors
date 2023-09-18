@@ -185,9 +185,9 @@ class MultiScaleData_2(Data):
     edge_domain_indicator: Tensor
     num_edges: Union[int,Tensor]
 
-    num_cycles: Union[int,Tensor]
     cycle_atoms: Tensor
     cycle_domain_indicator: Tensor
+    num_cycles: Union[int,Tensor]
     
     edge2cycle_domain_map_edge_index: Tensor
     edge2cycle_node_map_edge_index: Tensor
@@ -212,17 +212,19 @@ class MultiScaleData_2(Data):
             return self._get_num_edges()
         elif key == 'cycle_domain_indicator':
             return self._get_num_cycles()
-        elif key in ['edge2cycle_domain_map_edge_index','edge2cycle_node_map_edge_index']:
+        elif key == 'edge2cycle_node_map_edge_index':
+            return torch.tensor([[len(self.edge_atoms)],[len(self.cycle_atoms)]])
+        elif key == 'edge2cycle_domain_map_edge_index':
             return torch.tensor([[self._get_num_edges()],[self._get_num_cycles()]])
         elif key == 'edge2cycle_intersect_indicator':
             return self._get_edge2cycle_num_intersections()
         elif key == 'cycle_ind':
             return self.num_nodes
         elif key == 'edge_batch':
-            return self._get_num_edges()
+            return value.max() + 1
         elif key == 'cycle_batch':
             if len(value) > 0:
-                return self._get_num_cycles()
+                return value.max() + 1
             else:
                 return torch.tensor(1)
         else:

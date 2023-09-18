@@ -1,4 +1,4 @@
-from model_3 import Net
+from model_4 import Net
 # from model_gine_2 import Net
 from torch.cuda import is_available
 from argparse import ArgumentParser
