@@ -24,7 +24,7 @@ parser.add_argument('--lr',type=float,default=0.001)
 parser.add_argument('--min_lr',type=float,default=1E-5)
 parser.add_argument('--train_batch_size',type=int,default=128)
 
-parser.add_argument('--eval_batch_size',type=int,default=1000)
+parser.add_argument('--eval_batch_size',type=int,default=512)
 parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
 parser.add_argument('--use_old_model',action='store_true')
