@@ -138,14 +138,14 @@ class SplitLayer0_1(Module):
         self.epsilon1_2 = Parameter(torch.tensor(0.),requires_grad=True)
         self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
     def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge: TransferData1) -> tuple[Tensor,Tensor]:
-        lift_aggr = transfer0_1(node_rep,node2edge)
+        lift_aggr = transfer0_1(node_rep,node2edge,['mean','sum'])
         
 
         lvl_aggr_edge = self.lvl_mlp_1(torch.cat([lift_aggr,edge_rep],-1))
 
         # lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
         
-        lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),return_list=True)
+        lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),['mean','sum','mean'],return_list=True)
 
         node_out = self.lvl_mlp_2((1 + self.epsilon1_1) * node_rep + (1 + self.epsilon1_2) * lvl_aggr[0] + lvl_aggr[1])
         edge_out = self.lift_mlp((1 + self.epsilon2) * linmaps1_1(edge_rep,node2edge.target,'mean') + lift_aggr)
