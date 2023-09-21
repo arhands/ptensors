@@ -26,14 +26,14 @@ def transfer0_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
     """
     if isinstance(reduce,str):
         reduce = [reduce]*2
-    node_reduced = scatter(x[data.source.domain_indicator],data.source.atoms,0,dim_size=data.num_nodes,reduce=reduce[0])
+    # node_reduced = scatter(x[data.source.domain_indicator],data.source.atoms,0,dim_size=data.num_nodes,reduce=reduce[0])
+    to_target = x[data.domain_map_edge_index[0]]
+    intersection_broadcasted = scatter(to_target[data.intersect_indicator],data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[0])
+    target_broadcasted = scatter(to_target,data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])[data.target.domain_indicator]
 
-    target_broadcasted = node_reduced[data.target.atoms]
-
-    intersection_broadcasted = scatter(x[data.domain_map_edge_index[0]],data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])[data.target.domain_indicator]
     return torch.cat([
-        target_broadcasted,
         intersection_broadcasted,
+        target_broadcasted,
     ],-1)
 
 def transfer0_1_bi_msg(x: Tensor, data: TransferData1, encoder_int: Callable[[Tensor,Tensor],Tensor], encoder_inv: Callable[[Tensor,Tensor],Tensor], y: Tensor, reduce: Union[list[str],str]='sum'):
