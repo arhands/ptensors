@@ -11,7 +11,7 @@ class transfer0_1_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([1]).unsqueeze(-1)
 
@@ -28,7 +28,7 @@ class transfer0_1_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([1,10]).unsqueeze(-1)
 
@@ -58,7 +58,7 @@ class transfer1_0_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([1,10,100]).unsqueeze(-1)
 
@@ -76,7 +76,7 @@ class transfer1_0_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([
             1,2,4,
@@ -99,7 +99,7 @@ class transfer1_1_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([1,10,100]).unsqueeze(-1)
         
@@ -128,7 +128,7 @@ class transfer1_1_test(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([
             1,10,100,
