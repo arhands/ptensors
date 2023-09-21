@@ -4,31 +4,15 @@ from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Par
 from torch import Tensor
 from typing import List, Literal, NamedTuple, Union, Optional, Tuple
 from torch_geometric.data import Data
-from torch_geometric.nn import global_add_pool, GINEConv, GINConv
+from torch_geometric.nn import global_add_pool, global_mean_pool
 from torch_scatter import scatter_sum
 from objects import MultiScaleData
+from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding0
+from torch.nn import functional as F
 
 _inner_mlp_mult = 2
 
-def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
-    if ds == 'ZINC':
-        return Embedding(4,hidden_dim)
-    else: 
-        raise NameError(f'Dataset {ds} unknown.')
 
-def get_node_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
-    if ds == 'ZINC':
-        return Embedding(22,hidden_dim)
-    else: 
-        raise NameError(f'Dataset {ds} unknown.')
-
-class CycleEmbedding(Module):
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        self.emb = Embedding(22,hidden_dim)
-    def forward(self, x: Tensor, atom_to_cycle: Tensor):
-        x = self.emb(x)
-        return scatter_sum(x[atom_to_cycle[0]],atom_to_cycle[1],0)
 
 class SplitLayer(Module):
     r"""
@@ -81,7 +65,7 @@ class SplitLayer(Module):
         return node_out, edge_out
 
 class ModelLayer(Module):
-    def __init__(self, hidden_channels: int) -> None:
+    def __init__(self, hidden_channels: int, dropout: float) -> None:
         super().__init__()
         self.node_edge = SplitLayer(hidden_channels)
         self.edge_cycle = SplitLayer(hidden_channels)
@@ -90,6 +74,7 @@ class ModelLayer(Module):
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
+        self.dropout = dropout
         
     def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData) -> tuple[Tensor,Tensor,Tensor]:
         node_out, edge_out_1 = self.node_edge(node_rep,edge_rep,data.node2edge_index)
@@ -97,19 +82,26 @@ class ModelLayer(Module):
 
         edge_out = self.mlp(torch.cat([edge_out_1,edge_out_2],-1))
         
+        if self.dropout > 0.:
+            node_out = F.dropout(node_out,self.dropout,self.training)
+            edge_out = F.dropout(edge_out,self.dropout,self.training)
+            cycle_out = F.dropout(cycle_out,self.dropout,self.training)
+
         return node_out, edge_out, cycle_out
 
 
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC'], residual: bool) -> None:
+    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv'], residual: bool, readout: Literal['mean','sum']) -> None:
         super().__init__()
         # Initialization layers
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
         self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
-        self.cycle_encoder = CycleEmbedding(hidden_dim)
+        self.cycle_encoder = CycleEmbedding0(hidden_dim,dataset)
+
+        self.readout = readout
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim) for _ in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim,dropout) for _ in range(num_layers))
         # finalization layers
         self.pool_mlps = ModuleList([Sequential(
             Linear(hidden_dim,hidden_dim*2,False),
@@ -128,11 +120,12 @@ class Net(Module):
         for layer in self.layers:
             node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,data)
         
+        pool_fn = global_add_pool if self.readout == 'sum' else global_mean_pool
         # finalizing model
         reps = [
-            global_add_pool(node_rep,data.batch,size=data.num_graphs),
-            global_add_pool(edge_rep,data.edge_batch,size=data.num_graphs),
-            global_add_pool(cycle_rep,data.cycle_batch,size=data.num_graphs)
+            pool_fn(node_rep,data.batch,size=data.num_graphs),
+            pool_fn(edge_rep,data.edge_batch,size=data.num_graphs),
+            pool_fn(cycle_rep,data.cycle_batch,size=data.num_graphs)
         ]
         rep = torch.sum(torch.stack([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)]),0)
         return self.lin(rep)

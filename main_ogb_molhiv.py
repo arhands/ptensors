@@ -13,24 +13,26 @@ import os
 # filterwarnings("ignore",category=UserWarning)
 
 parser = ArgumentParser()
-parser.add_argument('--hidden_channels',type=int,default=128)
-parser.add_argument('--num_layers',type=int,default=4)
+parser.add_argument('--hidden_channels',type=int,default=64)
+parser.add_argument('--num_layers',type=int,default=2)
 parser.add_argument('--residual',action='store_true')
-parser.add_argument('--dropout',type=float,default=0.)
+parser.add_argument('--dropout',type=float,default=0.5)
 
 parser.add_argument('--patience',type=int,default=30)
-parser.add_argument('--num_epochs',type=int,default=1000)
-parser.add_argument('--lr',type=float,default=0.001)
-parser.add_argument('--min_lr',type=float,default=1E-5)
+parser.add_argument('--num_epochs',type=int,default=150)
+parser.add_argument('--lr',type=float,default=0.0001)
+# parser.add_argument('--min_lr',type=float,default=1E-5)
 parser.add_argument('--train_batch_size',type=int,default=128)
 
-parser.add_argument('--eval_batch_size',type=int,default=512)
+parser.add_argument('--eval_batch_size',type=int,default=1000)
+parser.add_argument('--max_ring_size',type=int,default=6)
 parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
 parser.add_argument('--use_old_model',action='store_true')
 
 args = parser.parse_args()
 
+dataset_name = 'ogbg-molhiv'
 
 if args.use_old_model:
     ds_path = 'data_old'
@@ -40,6 +42,7 @@ else:
     ds_path = 'data'
     from transforms import PreprocessTransform
     from model import Net
+
 def ensure_exists(path: str):
     base = ''
     for segment in path.split('/'):
@@ -55,7 +58,7 @@ else:
 
 
 overview_log_path = f"{run_path}/summary.log"
-with open(overview_log_path,'w') as file:
+with open(overview_log_path,'a') as file:
     intital_info = {
         'start date and time' : datetime.now().strftime(r"%d/%m/%Y %H:%M:%S"),
         **vars(args)
@@ -68,11 +71,11 @@ with open(overview_log_path,'w') as file:
 
 device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
 
-model = Net(args.hidden_channels,args.num_layers,args.dropout,'ZINC',args.residual).to(device)
+model = Net(args.hidden_channels,args.num_layers,args.dropout,dataset_name,args.residual,'mean').to(device)
 
-model = ModelHandler(model,args.lr,args.patience)
+model = ModelHandler(model,args.lr,dataset_name)
 
-data_handler = DataHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,'ZINC',PreprocessTransform())
+data_handler = DataHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,dataset_name,PreprocessTransform(args.max_ring_size))
 
 with open(overview_log_path,'a') as file:
     file.writelines([
@@ -80,7 +83,7 @@ with open(overview_log_path,'a') as file:
         str(model)
     ])
 
-trainer = get_trainer(run_path,args.num_epochs,args.min_lr)
+trainer = get_trainer(run_path,args.num_epochs,None,'max')
 
 trainer.fit(model,datamodule=data_handler)
 

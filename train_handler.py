@@ -1,18 +1,24 @@
 import os
+from typing import Literal, Optional
 from lightning.pytorch.callbacks import ModelSummary
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, ModelCheckpoint
 from lightning import Trainer
 
-def get_trainer(root_dir: str, max_epochs: int, min_lr: float) -> Trainer:
-    mode = 'min'
+# def get_dataset_mode(ds: Literal['ZINC','ogbg-molhiv']):
+#     return {
+#         'ZINC' : 'min',
+#         'ogbg-molhiv' : 'max',
+#     }[ds]
+
+def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: Literal['min','max']) -> Trainer:
     callbacks = [
         ModelCheckpoint(root_dir + '/checkpoints/',monitor='val_score',mode=mode,save_top_k=1),
         ModelSummary(4),
         TQDMProgressBar(refresh_rate=10),
-        # LearningRateMonitor("epoch"),
-        EarlyStopping('lr-Adam',0,max_epochs,mode="min",verbose=True,check_finite=False,stopping_threshold=min_lr)
     ]
+    if min_lr is not None:
+        callbacks.append(EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr))
     #if trial is not None:
     #    callbacks.append(PyTorchLightningPruningCallback(trial,'validation_score'))
     #logger = logging.getLogger('lightning.pytorch.core')

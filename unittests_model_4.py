@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 from objects import TransferData1, atomspack1, MultiScaleData_2
 from ptensors1 import linmaps1_1, transfer0_1, transfer1_0, transfer0_1_bi_msg
-from transforms import PreprocessTransform_4 as PreprocessTransform
+from transforms import PreprocessTransform as PreprocessTransform
 from model_4 import Net, ModelLayer, get_node_encoder, get_edge_encoder, CycleEmbedding, SplitLayer, EdgeCycleSplitLayer
 from torch_geometric.datasets import ZINC
 from torch_geometric.data import Batch

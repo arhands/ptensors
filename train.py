@@ -3,7 +3,7 @@ from torch.nn.functional import l1_loss
 from torch_geometric.loader import DataLoader
 from torch.nn import Module, L1Loss
 from tqdm import tqdm
-from transforms import PreprocessTransform
+from transforms import PreprocessTransform_old
 
 @torch.no_grad()
 def test(model: Module, dataloader: DataLoader, description: str, device: str, position: int = 1) -> float:
