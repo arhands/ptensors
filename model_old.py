@@ -8,6 +8,8 @@ from torch_geometric.nn import global_add_pool, GINEConv, GINConv
 from torch_scatter import scatter_sum
 from objects import MultiScaleData
 
+_inner_mlp_mult = 2
+
 def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC']) -> Module:
     if ds == 'ZINC':
         return Embedding(4,hidden_dim)
@@ -35,10 +37,10 @@ class SplitLayer(Module):
     def __init__(self, hidden_channels: int) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
-            Linear(hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult),
             ReLU(True),
-            Linear(hidden_channels,hidden_channels,False),
+            Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -48,10 +50,10 @@ class SplitLayer(Module):
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
-            Linear(hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult),
             ReLU(True),
-            Linear(hidden_channels,hidden_channels,False),
+            Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
@@ -59,14 +61,17 @@ class SplitLayer(Module):
         self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
     def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge_index: Tensor) -> tuple[Tensor,Tensor]:
         node2edge_val = node_rep[node2edge_index[0]]
-        node2edge_msg = torch.cat([node2edge_val,edge_rep[node2edge_index[1]]],-1)
-        node2edge_msg = self.lvl_mlp_1(node2edge_msg)
-        cat_edge_rep = scatter_sum(torch.cat([node2edge_msg,node2edge_val],-1),node2edge_index[1],0,dim_size=len(edge_rep))
+        # node2edge_msg = torch.cat([node2edge_val,edge_rep[node2edge_index[1]]],-1)
+        # node2edge_msg = self.lvl_mlp_1(node2edge_msg)
+        # cat_edge_rep = scatter_sum(torch.cat([node2edge_msg,node2edge_val],-1),node2edge_index[1],0,dim_size=len(edge_rep))
 
-        lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
+        lift_aggr = scatter_sum(node2edge_val,node2edge_index[1],0,dim_size=len(edge_rep))
+        lvl_aggr_edge = self.lvl_mlp_1(torch.cat([lift_aggr,edge_rep],-1))
+
+        # lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
         
         lvl_aggr_edge = lvl_aggr_edge[node2edge_index[1]] # broadcasting back to node-edge pairs
-        lvl_aggr_edge = lvl_aggr_edge - node2edge_msg # removing self-messages
+        # lvl_aggr_edge = lvl_aggr_edge - node2edge_msg # removing self-messages
         
         lvl_aggr = scatter_sum(lvl_aggr_edge,node2edge_index[0],0,dim_size=len(node_rep))
 
@@ -112,6 +117,7 @@ class Net(Module):
             ReLU(True),
         ) for _ in range(3)])
         self.lin = Linear(hidden_dim*2,1)
+
     def forward(self, data: MultiScaleData) -> Tensor:
         # initializing model
         node_rep = self.atom_encoder(data.x)

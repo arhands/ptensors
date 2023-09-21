@@ -3,6 +3,7 @@ from typing import Any, NamedTuple, Optional, Union
 import torch
 from torch import Tensor
 from torch_geometric.data import Data
+from torch_scatter import scatter_add
 
 class atomspack1(NamedTuple):
     atoms: Tensor
@@ -10,10 +11,20 @@ class atomspack1(NamedTuple):
     domain_indicator: Tensor
     num_domains: int
     
-    def overlaps(self, other: atomspack1):
-
+    def overlaps(self, other: atomspack1, ensure_source_subgraphs: bool):
+        r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
+        if len(self.atoms) == 0 or len(other.atoms) == 0:
+            return torch.empty(2,0,dtype=torch.int64)
         # NOTE: This is not super efficient, but python overhead is O(1)!
         incidence = self.atoms.unsqueeze(1) == other.atoms.unsqueeze(0)
+        if ensure_source_subgraphs:
+            incidence_domains = scatter_add(incidence.int(),self.domain_indicator,0)
+            incidence_domains = scatter_add(incidence_domains,other.domain_indicator,1)
+            source_domain_size = scatter_add(torch.ones_like(self.domain_indicator),self.domain_indicator,0)
+            incidence_mask_domain = incidence_domains == source_domain_size.unsqueeze(1)
+            incidence_mask = incidence_mask_domain[self.domain_indicator][:,other.domain_indicator]
+
+            incidence[~incidence_mask] = False
         incidence = incidence.to_sparse_coo().coalesce()
         return incidence.indices()
         # return torch.stack([
@@ -91,14 +102,21 @@ class TransferData1(TransferData0):
         return self
 
     @classmethod
-    def from_atomspacks(cls, source: atomspack1, target: atomspack1):
+    def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
         # computing nodes in the target domains that are intersected with.
-        overlaps = source.overlaps(target)
+        overlaps = source.overlaps(target,ensure_sources_subgraphs)
         source_domains = source.domain_indicator[overlaps[0]]
         target_domains = target.domain_indicator[overlaps[1]]
         
         # 'intersect_indicator' represents the map from the source/target tensors to the intersections.
         domain_overlaps_edge_index, intersect_indicator = torch.stack([source_domains,target_domains]).unique(dim=1,return_inverse=True)
+
+        # if ensure_sources_subgraphs:
+        #     overlap_size_source = scatter_add(torch.ones_like(intersect_indicator),intersect_indicator,0,dim_size=source.num_domains)
+        #     source_size = scatter_add(torch.ones_like(source.domain_indicator),source.domain_indicator,0,dim_size=source.num_domains)
+        #     mask_intersect_domains = overlap_size_source == source_size[domain_overlaps_edge_index[0]]
+        #     mask_intersect_nodes = mask_intersect_domains[intersect_indicator]
+
 
         if source.num_domains > 0:
             num_nodes = source.atoms.max().item()
@@ -118,25 +136,6 @@ class TransferData1(TransferData0):
             num_nodes,
             intersect_indicator)
 
-class MultiTransferData1:
-    r"""NOTE: we assume symmetry"""
-    atomspacks: list[atomspack1]
-    transfer_data: dict[tuple(int,int),TransferData1]
-    num_nodes: int
-    
-    def __init__(self, atomspacks: list[atomspack1]) -> None:
-        self.atomspacks = atomspacks
-        self.transfer_data = dict[tuple(int,int),TransferData1]()
-    
-    def __getitem__(self, idx: tuple(int,int)):
-        if idx in self.transfer_data:
-            return self.transfer_data[idx]
-        else:
-            forward_map = TransferData1.from_atomspacks(self.atomspacks[idx[0]],self.atomspacks[idx[1]])
-            backward_map = forward_map.reverse()
-            self.transfer_data[idx] = forward_map
-            self.transfer_data[[idx[1],idx[0]]] = backward_map
-            return forward_map
 
 
 

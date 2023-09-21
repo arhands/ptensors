@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 import torch
 from torch import Tensor
 from torch_scatter import scatter
@@ -55,11 +55,33 @@ def transfer0_1_bi_msg(x: Tensor, data: TransferData1, encoder_int: Callable[[Te
 
     out_int = scatter(msg_int,data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[2])
     out_inv = scatter(msg_inv,data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[3])
-    out = out_int + out_inv[data.target.domain_indicator]
 
-    return out
+    return (
+        out_int,
+        out_inv[data.target.domain_indicator],
+    )
 
-def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum'):
+def transfer1_0_msg(x: Tensor, data: TransferData1, encoder_int: Optional[Callable[[Tensor],Tensor]], encoder_inv: Optional[Callable[[Tensor],Tensor]], reduce: Union[list[str],str]='sum'):
+    r"""for transfering from a ptensors0 to a ptensors1."""
+    if isinstance(reduce,str):
+        reduce = [reduce]*3
+    
+    res = []
+    if encoder_int is not None:
+        int_msg = x[data.node_map_edge_index[0]]
+        int_msg = encoder_int(int_msg)
+        node_maps = scatter(int_msg,data.target.domain_indicator[data.node_map_edge_index[1]],0,dim_size=data.target.num_domains,reduce=reduce[2])
+        res.append(node_maps)
+
+    if encoder_inv is not None:
+        domain_reduced = scatter(x,data.source.domain_indicator,0,reduce=reduce[0])
+        inv_msg = domain_reduced[data.domain_map_edge_index[0]]
+        inv_msg = encoder_inv(inv_msg)
+        domain_maps = scatter(inv_msg,data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])
+        res.append(domain_maps)
+    return torch.cat(res,-1)
+
+def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum', return_list: bool = False):
     r"""for transfering from a ptensors0 to a ptensors1"""
     if isinstance(reduce,str):
         reduce = [reduce]*3
@@ -69,10 +91,13 @@ def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
 
     node_maps = scatter(x[data.node_map_edge_index[0]],data.target.domain_indicator[data.node_map_edge_index[1]],0,dim_size=data.target.num_domains,reduce=reduce[2])
     # node_maps = scatter(node_maps,,0,dim_size=data.target.num_domains,reduce=reduce[3])
-    return torch.cat([
+    ret = [
         node_maps,
         domain_maps,
-    ],-1)
+    ]
+    if return_list:
+        return ret
+    return torch.cat(ret,-1)
 
 def transfer1_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum'):
     r"""for transfering from a ptensors1 to a ptensors1"""

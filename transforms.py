@@ -44,7 +44,7 @@ class PreprocessTransform(BaseTransform):
             cycles_ap = atomspack1.from_list(cycles)
 
             
-            edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap)
+            edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap,True)
             data.edge2cycle_index = edges_to_cycles.domain_map_edge_index
             
             data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
@@ -59,6 +59,7 @@ class PreprocessTransform(BaseTransform):
             
             data.cycle_batch = torch.zeros(0,dtype=torch.int64)
 
+        data.num_nodes = len(data.x)
         return data
 
 class PreprocessTransform_2(BaseTransform):
@@ -93,7 +94,7 @@ class PreprocessTransform_2(BaseTransform):
         
         cycles = [c.to_list() for c in cycles]
         cycles = atomspack1.from_list(cycles)
-        edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles)
+        edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles,True)
         data.set_edge2cycle(edge2cycle)
         
         data.num_nodes = len(data.x)
@@ -132,7 +133,7 @@ class PreprocessTransform_4(BaseTransform):
         
         cycles = [c.to_list() for c in cycles]
         cycles = atomspack1.from_list(cycles)
-        edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles)
+        edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles,True)
         data.set_edge2cycle_4(edge2cycle)
 
         # added for debug:
