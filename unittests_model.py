@@ -14,8 +14,8 @@ class batching(TestCase):
     def test_batching(self):
         ds = ZINC('data/ZINC_base',True,'val')
         tf = PreprocessTransform()
-        sub_batch_size = 2
-        num_sub_batches = 2
+        sub_batch_size = 3
+        num_sub_batches = 3
         graphs : list[MultiScaleData] = [tf(ds[i]) for i in range(sub_batch_size*num_sub_batches)] #type: ignore
         small_batches = [Batch.from_data_list([graphs[i*sub_batch_size + j] for j in range(sub_batch_size)]) for i in range(num_sub_batches)] #type: ignore
         batch = Batch.from_data_list(graphs) #type: ignore
