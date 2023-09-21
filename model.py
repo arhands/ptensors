@@ -9,7 +9,7 @@ from objects import MultiScaleData_2, TransferData1
 from ptensors1 import linmaps1_1, transfer0_1, transfer1_0
 from torch.nn import functional as F
 
-from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding1, AffineSum
+from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding1
 
 _inner_mlp_mult = 2
 
@@ -134,9 +134,9 @@ class SplitLayer0_1(Module):
             BatchNorm1d(hidden_channels),
             ReLU(True)
         )
-        self.epsilon1 = Parameter(torch.tensor(0.),requires_grad=True)
+        self.epsilon1_1 = Parameter(torch.tensor(0.),requires_grad=True)
+        self.epsilon1_2 = Parameter(torch.tensor(0.),requires_grad=True)
         self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
-        self.lvl_affine = AffineSum()
     def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge: TransferData1) -> tuple[Tensor,Tensor]:
         lift_aggr = transfer0_1(node_rep,node2edge)
         
@@ -147,7 +147,7 @@ class SplitLayer0_1(Module):
         
         lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),return_list=True)
 
-        node_out = self.lvl_mlp_2((1 + self.epsilon1) * node_rep + self.lvl_affine(*lvl_aggr))
+        node_out = self.lvl_mlp_2((1 + self.epsilon1_1) * node_rep + (1 + self.epsilon1_2) * lvl_aggr[0] + lvl_aggr[1])
         edge_out = self.lift_mlp((1 + self.epsilon2) * linmaps1_1(edge_rep,node2edge.target,'mean') + lift_aggr)
 
         return node_out, edge_out
