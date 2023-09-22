@@ -1,6 +1,6 @@
 import math
-from typing import Any, Iterable, List, Union, Tuple, overload
-from torch_geometric.transforms import BaseTransform
+from typing import Any, Iterable, List, Literal, Union, Tuple, overload
+from torch_geometric.transforms import BaseTransform, Compose
 from torch_geometric.data import Batch, Data
 from induced_cycle_finder import from_edge_index, get_induced_cycles
 import torch
@@ -17,9 +17,6 @@ class PreprocessTransform_old(BaseTransform):
         data = MultiScaleData()
         data.__dict__.update(data_.__dict__)
         
-        data.x = data.x.flatten()
-        data.y = data.y.flatten()
-        data.edge_attr = data.edge_attr.flatten()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
@@ -66,6 +63,18 @@ class PreprocessTransform_old(BaseTransform):
         data.num_nodes = len(data.x)
         return data
 
+class HIVPreprocessor(BaseTransform):
+    def __call__(self, data: Any) -> Any:
+        data.y = data.y.long()
+        return data
+
+class ZINCPreprocessor(BaseTransform):
+    def __call__(self, data: Any) -> Any:
+        data.x = data.x.flatten()
+        data.y = data.y.flatten()
+        data.edge_attr = data.edge_attr.flatten()
+        return data 
+    
 class PreprocessTransform(BaseTransform):
     def __init__(self, max_cycle_size: Union[int,float] = math.inf) -> None:
         super().__init__()
@@ -75,9 +84,12 @@ class PreprocessTransform(BaseTransform):
         data = MultiScaleData_2()
         data.__dict__.update(data_.__dict__)
         
-        data.x = data.x.flatten()
-        data.y = data.y.flatten()
-        data.edge_attr = data.edge_attr.flatten()
+        if data.x.size(1) == 1:
+            data.x = data.x.flatten()
+        if data.y.size(1) == 1:
+            data.y = data.y.flatten()
+        if data.edge_attr.size(1) == 1:
+            data.edge_attr = data.edge_attr.flatten()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
@@ -108,3 +120,12 @@ class PreprocessTransform(BaseTransform):
         # added for debug:
         data.num_nodes = len(data.x)
         return data
+
+def get_transform(ds: Literal['ZINC','ogbg-molhiv'], use_old: bool):
+    return Compose([
+        {
+            'ZINC' : ZINCPreprocessor,
+            'ogbg-molhiv' : HIVPreprocessor,
+        }[ds](),
+        PreprocessTransform_old() if use_old else PreprocessTransform()
+    ])
