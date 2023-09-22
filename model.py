@@ -61,27 +61,27 @@ class SplitLayer(Module):
     r"""
     Computes the lift layer for the higher rep and level layer for 
     """
-    def __init__(self, hidden_channels: int) -> None:
+    def __init__(self, hidden_channels: int, eps: float, momentum: float) -> None:
         super().__init__()
         self.lift_mlp = Sequential(
             Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
-            BatchNorm1d(hidden_channels*_inner_mlp_mult),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
             ReLU(True),
             Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.lvl_mlp_1 = Sequential(
             Linear(2*hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
             Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
-            BatchNorm1d(hidden_channels*_inner_mlp_mult),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
             ReLU(True),
             Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.epsilon1 = Parameter(torch.tensor(0.),requires_grad=True)
@@ -111,56 +111,60 @@ class SplitLayer0_1(Module):
     r"""
     Computes the lift layer for the higher rep and level layer for 
     """
-    def __init__(self, hidden_channels: int) -> None:
+    def __init__(self, hidden_channels: int, eps: float, momentum: float, reduce_ptensor: str, reduce_messages: str = 'sum') -> None:
         super().__init__()
         self.lift_mlp = Sequential(
             Linear(2*hidden_channels,hidden_channels*_inner_mlp_mult,False),
-            BatchNorm1d(hidden_channels*_inner_mlp_mult),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
             ReLU(True),
             Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.lvl_mlp_1 = Sequential(
             Linear(3*hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.lvl_mlp_2 = Sequential(
             Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
-            BatchNorm1d(hidden_channels*_inner_mlp_mult),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
             ReLU(True),
             Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.epsilon1_1 = Parameter(torch.tensor(0.),requires_grad=True)
         self.epsilon1_2 = Parameter(torch.tensor(0.),requires_grad=True)
         self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
+
+        self.reduce_messages = reduce_messages
+        self.reduce_ptensor = reduce_ptensor
     def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge: TransferData1) -> tuple[Tensor,Tensor]:
-        lift_aggr = transfer0_1(node_rep,node2edge,['mean','sum'])
+        lift_aggr = transfer0_1(node_rep,node2edge,[self.reduce_ptensor,self.reduce_messages])
         
 
         lvl_aggr_edge = self.lvl_mlp_1(torch.cat([lift_aggr,edge_rep],-1))
 
         # lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
         
-        lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),['mean','sum','mean'],return_list=True)
+        lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),[self.reduce_ptensor,self.reduce_messages,'mean'],return_list=True)
 
         node_out = self.lvl_mlp_2((1 + self.epsilon1_1) * node_rep + (1 + self.epsilon1_2) * lvl_aggr[0] + lvl_aggr[1])
         edge_out = self.lift_mlp((1 + self.epsilon2) * linmaps1_1(edge_rep,node2edge.target,'mean') + lift_aggr)
+        # edge_out = self.lift_mlp((1 + self.epsilon2) * linmaps1_1(edge_rep,node2edge.target,self.reduce_ptensor) + lift_aggr)
 
         return node_out, edge_out
 
 
 class ModelLayer(Module):
-    def __init__(self, hidden_channels: int, dropout: float) -> None:
+    def __init__(self, hidden_channels: int, dropout: float,eps: float, momentum: float, reduce_ptensors: str) -> None:
         super().__init__()
-        self.node_edge = SplitLayer(hidden_channels)
-        self.edge_cycle = SplitLayer0_1(hidden_channels)
+        self.node_edge = SplitLayer(hidden_channels, eps,momentum)
+        self.edge_cycle = SplitLayer0_1(hidden_channels, eps, momentum, reduce_ptensors)
         self.mlp = Sequential(
             Linear(2*hidden_channels,hidden_channels,False),
-            BatchNorm1d(hidden_channels),
+            BatchNorm1d(hidden_channels,eps,momentum),
             ReLU(True)
         )
         self.dropout = dropout
@@ -178,20 +182,22 @@ class ModelLayer(Module):
 
 
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv'], residual: bool, readout: Literal['mean','sum']) -> None:
+    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv'], readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str) -> None:
         super().__init__()
+        assert readout in ['mean','sum']
+        assert dataset in ['ZINC','ogbg-molhiv']
         # Initialization layers
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
         self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
         self.cycle_encoder = CycleEmbedding1(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout) for _ in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,eps,momentum, reduce_ptensors) for _ in range(num_layers))
         self.readout = readout
         # finalization layers
         self.pool_mlps = ModuleList([Sequential(
             Linear(hidden_dim,hidden_dim*2,False),
-            BatchNorm1d(hidden_dim*2),
+            BatchNorm1d(hidden_dim*2,eps,momentum),
             ReLU(True),
         ) for _ in range(3)])
         self.lin = Linear(hidden_dim*2,1)

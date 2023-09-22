@@ -15,7 +15,6 @@ import os
 parser = ArgumentParser()
 parser.add_argument('--hidden_channels',type=int,default=128)
 parser.add_argument('--num_layers',type=int,default=4)
-parser.add_argument('--residual',action='store_true')
 parser.add_argument('--dropout',type=float,default=0.)
 
 parser.add_argument('--patience',type=int,default=30)
@@ -28,19 +27,26 @@ parser.add_argument('--eval_batch_size',type=int,default=512)
 parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
 parser.add_argument('--use_old_model',action='store_true')
+parser.add_argument('--bn_eps',type=float,default=0.00001)
+parser.add_argument('--bn_momentum',type=float,default=0.1)
+parser.add_argument('--ptensor_reduction',type=str,default='mean')
 
 args = parser.parse_args()
 
 dataset = 'ZINC'
 
+device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
+
 if args.use_old_model:
     ds_path = 'data/ZINC_1'
     from transforms import PreprocessTransform_old as PreprocessTransform
     from model_old import Net
+    model = Net(args.hidden_channels,args.num_layers,args.dropout,'ZINC',args.residual,'sum').to(device)
 else:
     ds_path = 'data/ZINC'
     from transforms import PreprocessTransform
     from model import Net
+    model = Net(args.hidden_channels,args.num_layers,args.dropout,'ZINC','sum',args.bn_eps,args.bn_momentum,args.ptensor_reduction).to(device)
 def ensure_exists(path: str):
     base = ''
     for segment in path.split('/'):
@@ -66,10 +72,6 @@ with open(overview_log_path,'w') as file:
         for k in intital_info
     ]
     file.writelines(lines)
-
-device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
-
-model = Net(args.hidden_channels,args.num_layers,args.dropout,'ZINC',args.residual,'sum').to(device)
 
 model = ModelHandler(model,args.lr,'ZINC',lr_patience = args.patience, mode='min')
 
