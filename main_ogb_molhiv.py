@@ -15,7 +15,6 @@ import os
 parser = ArgumentParser()
 parser.add_argument('--hidden_channels',type=int,default=64)
 parser.add_argument('--num_layers',type=int,default=2)
-parser.add_argument('--residual',action='store_true')
 parser.add_argument('--dropout',type=float,default=0.5)
 
 parser.add_argument('--patience',type=int,default=30)
@@ -30,18 +29,33 @@ parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
 parser.add_argument('--use_old_model',action='store_true')
 
+parser.add_argument('--bn_eps',type=float,default=0.00001)
+parser.add_argument('--bn_momentum',type=float,default=0.1)
+parser.add_argument('--ptensor_reduction',type=str,default='mean')
+
 args = parser.parse_args()
 
 dataset_name = 'ogbg-molhiv'
-
+device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
 if args.use_old_model:
     ds_path = 'data_old'
     from transforms import PreprocessTransform_old as PreprocessTransform
     from model_old import Net
+    model = Net(args.hidden_channels,args.num_layers,args.dropout,dataset_name,args.residual,'mean').to(device)
 else:
     ds_path = 'data'
     from transforms import PreprocessTransform
     from model import Net
+    model = Net(
+        args.hidden_channels,
+        args.num_layers,
+        args.dropout,
+        dataset_name,
+        'mean',
+        args.bn_eps,
+        args.bn_momentum,
+        args.ptensor_reduction).to(device)
+
 
 def ensure_exists(path: str):
     base = ''
@@ -69,9 +83,7 @@ with open(overview_log_path,'a') as file:
     ]
     file.writelines(lines)
 
-device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
 
-model = Net(args.hidden_channels,args.num_layers,args.dropout,dataset_name,args.residual,'mean').to(device)
 
 model = ModelHandler(model,args.lr,dataset_name)
 
