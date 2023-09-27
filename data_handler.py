@@ -35,13 +35,16 @@ class DataHandler(pl.LightningDataModule):
                 split : ZINC(self.root,True,split,pre_transform=self.pre_transform)
                 for split in ['train','val','test']
             }
-        else:
+        elif self.ds_name == 'ogbg-molhiv':
             ds = PygGraphPropPredDataset(self.ds_name,self.root,pre_transform=self.pre_transform)
             split_idx = ds.get_idx_split()
             self.splits = {
-                split : ds[split_idx[split]]
-                for split in ['train','valid','test']
+                'train' : ds[split_idx['train']],
+                'val' : ds[split_idx['valid']],
+                'test' : ds[split_idx['test']],
             }
+        else:
+            raise NotImplementedError(f'Dataset setup for "{self.ds_name}" not implemented.')
     
     def train_dataloader(self):
         return self._get_dataloader('train',True)

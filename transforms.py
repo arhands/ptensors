@@ -65,7 +65,7 @@ class PreprocessTransform_old(BaseTransform):
 
 class HIVPreprocessor(BaseTransform):
     def __call__(self, data: Any) -> Any:
-        data.y = data.y.long()
+        data.y = data.y.float().flatten()
         return data
 
 class ZINCPreprocessor(BaseTransform):
@@ -84,12 +84,6 @@ class PreprocessTransform(BaseTransform):
         data = MultiScaleData_2()
         data.__dict__.update(data_.__dict__)
         
-        if data.x.size(1) == 1:
-            data.x = data.x.flatten()
-        if data.y.size(1) == 1:
-            data.y = data.y.flatten()
-        if data.edge_attr.size(1) == 1:
-            data.edge_attr = data.edge_attr.flatten()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
@@ -121,11 +115,13 @@ class PreprocessTransform(BaseTransform):
         data.num_nodes = len(data.x)
         return data
 
-def get_transform(ds: Literal['ZINC','ogbg-molhiv'], use_old: bool):
+def get_transform(ds: Literal['ZINC','ogbg-molhiv'],use_old: bool = False,max_cycle_size: Union[int,float] = math.inf):
     return Compose([
+        PreprocessTransform_old(max_cycle_size) if use_old else 
+        PreprocessTransform(max_cycle_size),
         {
             'ZINC' : ZINCPreprocessor,
             'ogbg-molhiv' : HIVPreprocessor,
         }[ds](),
-        PreprocessTransform_old() if use_old else PreprocessTransform()
+        
     ])
