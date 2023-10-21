@@ -33,12 +33,13 @@ parser.add_argument('--bn_eps',type=float,default=0.00001)
 parser.add_argument('--bn_momentum',type=float,default=0.1)
 parser.add_argument('--ptensor_reduction',type=str,default='mean')
 parser.add_argument('--optimizer',type=str,default='adam')
+parser.add_argument('--no_cycle2cycle',action='store_true')
 
 args = parser.parse_args()
 
 dataset_name = 'ogbg-molhiv'
 device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
-from transforms import get_transform
+from transforms import get_pre_transform, get_transform
 if args.use_old_model:
     ds_path = 'data_old'
     from model_old import Net
@@ -54,7 +55,7 @@ else:
         'mean',
         args.bn_eps,
         args.bn_momentum,
-        args.ptensor_reduction).to(device)
+        args.ptensor_reduction,not args.no_cycle2cycle).to(device)
 
 
 def ensure_exists(path: str):
@@ -71,7 +72,8 @@ else:
     ensure_exists(run_path)
 
 
-overview_log_path = f"{run_path}/summary.log"
+trainer, version = get_trainer(run_path,args.num_epochs,None,'max')
+overview_log_path = f"{run_path}/summary_{version}.log"
 with open(overview_log_path,'a') as file:
     intital_info = {
         'start date and time' : datetime.now().strftime(r"%d/%m/%Y %H:%M:%S"),
@@ -87,7 +89,7 @@ with open(overview_log_path,'a') as file:
 
 model = ModelHandler(model,args.lr,dataset_name,args.optimizer)
 
-data_handler = DataHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,dataset_name,get_transform(dataset_name,args.use_old_model,args.max_ring_size))
+data_handler = DataHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,dataset_name,get_pre_transform(dataset_name,args.use_old_model,args.max_ring_size,not args.no_cycle2cycle),get_transform(dataset_name))
 
 with open(overview_log_path,'a') as file:
     file.writelines([
@@ -95,7 +97,6 @@ with open(overview_log_path,'a') as file:
         str(model)
     ])
 
-trainer = get_trainer(run_path,args.num_epochs,None,'max')
 
 trainer.fit(model,datamodule=data_handler)
 

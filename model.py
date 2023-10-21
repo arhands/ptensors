@@ -10,6 +10,7 @@ from ptensors1 import linmaps1_1, transfer0_1, transfer1_0
 from torch.nn import functional as F
 
 from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding1
+from ptensors1_modules import AffineTransfer1_1, LinearTransfer1_1_simple
 
 _inner_mlp_mult = 2
 
@@ -156,9 +157,78 @@ class SplitLayer0_1(Module):
 
         return node_out, edge_out
 
+class SplitLayer0_1_complex(Module):
+    r"""
+    Computes the lift layer for the higher rep and level layer for 
+    """
+    def __init__(self, hidden_channels: int, eps: float, momentum: float, reduce_ptensor: str, reduce_messages: str = 'sum') -> None:
+        super().__init__()
+        self.lift_mlp = Sequential(
+            Linear(4*hidden_channels,hidden_channels*_inner_mlp_mult,False),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
+            ReLU(True),
+            Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
+            BatchNorm1d(hidden_channels,eps,momentum),
+            ReLU(True)
+        )
+        self.lvl_mlp_1 = Sequential(
+            Linear(3*hidden_channels,hidden_channels,False),
+            BatchNorm1d(hidden_channels,eps,momentum),
+            ReLU(True)
+        )
+        self.lvl_mlp_2 = Sequential(
+            Linear(hidden_channels*3,hidden_channels*_inner_mlp_mult,False),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
+            ReLU(True),
+            Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
+            BatchNorm1d(hidden_channels,eps,momentum),
+            ReLU(True)
+        )
+
+        self.reduce_messages = reduce_messages
+        self.reduce_ptensor = reduce_ptensor
+    def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge: TransferData1) -> tuple[Tensor,Tensor]:
+        lift_aggr = transfer0_1(node_rep,node2edge,[self.reduce_ptensor,self.reduce_messages])
+        
+
+        lvl_aggr_edge = self.lvl_mlp_1(torch.cat([lift_aggr,edge_rep],-1))
+
+        # lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
+        
+        lvl_aggr = transfer1_0(lvl_aggr_edge,node2edge.reverse(),[self.reduce_ptensor,self.reduce_messages,self.reduce_ptensor])
+
+        node_out = self.lvl_mlp_2(torch.cat([node_rep,lvl_aggr],-1))#type: ignore
+        edge_out = self.lift_mlp(torch.cat([linmaps1_1(edge_rep,node2edge.target,'mean'),lift_aggr],-1))
+        # edge_out = self.lift_mlp((1 + self.epsilon2) * linmaps1_1(edge_rep,node2edge.target,self.reduce_ptensor) + lift_aggr)
+
+        return node_out, edge_out
+
+class TransferLayer1_1(Module):
+    r"""
+    Computes the lift layer for the higher rep and level layer for 
+    """
+    def __init__(self, hidden_channels: int, eps: float, momentum: float) -> None:
+        super().__init__()
+        #self.transfer = LinearTransfer1_1_simple('mean','mean','mean','mean')
+        self.transfer = AffineTransfer1_1(hidden_channels,hidden_channels*_inner_mlp_mult)
+        self.mlp = Sequential(
+            #Linear(hidden_channels,hidden_channels*_inner_mlp_mult,False),
+            BatchNorm1d(hidden_channels*_inner_mlp_mult,eps,momentum),
+            ReLU(True),
+            Linear(hidden_channels*_inner_mlp_mult,hidden_channels,False),
+            BatchNorm1d(hidden_channels,eps,momentum),
+            ReLU(True)
+        )
+    def forward(self, cycle_rep: Tensor, cycle2cycle: TransferData1) -> Tensor:
+        
+        cycle_rep = self.transfer(cycle_rep,cycle2cycle)
+
+        cycle_rep = self.mlp(cycle_rep)
+        return cycle_rep
+
 
 class ModelLayer(Module):
-    def __init__(self, hidden_channels: int, dropout: float,eps: float, momentum: float, reduce_ptensors: str) -> None:
+    def __init__(self, hidden_channels: int, dropout: float,eps: float, momentum: float, reduce_ptensors: str, include_cycle_map: bool) -> None:
         super().__init__()
         self.node_edge = SplitLayer(hidden_channels, eps,momentum)
         self.edge_cycle = SplitLayer0_1(hidden_channels, eps, momentum, reduce_ptensors)
@@ -168,39 +238,61 @@ class ModelLayer(Module):
             ReLU(True)
         )
         self.dropout = dropout
+        self.include_cycle_map = include_cycle_map
+        if include_cycle_map:
+            self.cycle_cycle = TransferLayer1_1(hidden_channels,eps,momentum)
+            self.mlp_cycle = Sequential(
+                Linear(2*hidden_channels,hidden_channels,False),
+                BatchNorm1d(hidden_channels,eps,momentum),
+                ReLU(True)
+            )
         
-    def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData_2, edge2cycle: TransferData1) -> tuple[Tensor,Tensor,Tensor]:
+    def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: MultiScaleData_2, edge2cycle: TransferData1, cycle2cycle: Union[None,TransferData1]) -> tuple[Tensor,Tensor,Tensor]:
         node_out, edge_out_1 = self.node_edge(node_rep,edge_rep,data.node2edge_index)
         edge_out_2, cycle_out = self.edge_cycle(edge_rep,cycle_rep,edge2cycle)
 
         edge_out = self.mlp(torch.cat([edge_out_1,edge_out_2],-1))
 
+        if self.include_cycle_map:
+            cycle_out_2 = self.cycle_cycle(cycle_rep,cycle2cycle)
+            cycle_out = self.mlp_cycle(torch.cat([cycle_out,cycle_out_2],-1))
+
         node_out = F.dropout(node_out,self.dropout,self.training)
         edge_out = F.dropout(edge_out,self.dropout,self.training)
         cycle_out = F.dropout(cycle_out,self.dropout,self.training)
+
+
         return node_out, edge_out, cycle_out
 
 
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv'], readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str) -> None:
+    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'], readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str, include_cycle2cycle: bool = False) -> None:
         super().__init__()
         assert readout in ['mean','sum']
-        assert dataset in ['ZINC','ogbg-molhiv']
+        assert dataset in ['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'], dataset
         # Initialization layers
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
         self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
         self.cycle_encoder = CycleEmbedding1(hidden_dim,dataset)
 
         # convolutional layers
-        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,eps,momentum, reduce_ptensors) for _ in range(num_layers))
+        self.layers = ModuleList(ModelLayer(hidden_dim,dropout,eps,momentum, reduce_ptensors,include_cycle2cycle) for _ in range(num_layers))
         self.readout = readout
         # finalization layers
+        self.include_cycle2cycle = include_cycle2cycle
         self.pool_mlps = ModuleList([Sequential(
             Linear(hidden_dim,hidden_dim*2,False),
             BatchNorm1d(hidden_dim*2,eps,momentum),
             ReLU(True),
         ) for _ in range(3)])
-        self.lin = Linear(hidden_dim*2,1)
+        if dataset == 'ogbg-moltox21':
+            out_dim = 12
+        elif dataset == 'peptides-struct':
+            out_dim = 11
+        else:
+            out_dim = 1
+        self.lin = Linear(hidden_dim*2,out_dim)
+
         self.dropout = dropout
     def forward(self, data: MultiScaleData_2) -> Tensor:
         # initializing model
@@ -208,10 +300,11 @@ class Net(Module):
         edge_rep = self.edge_encoder(data.edge_attr)
         cycle_rep = self.cycle_encoder(data.x,(data.cycle_atoms,data.cycle_domain_indicator))
         edge2cycle = data.get_edge2cycle()
+        cycle2cycle = data.get_cycle2cycle() if self.include_cycle2cycle else None
 
         # performing message passing
         for layer in self.layers:
-            node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,data,edge2cycle)
+            node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,data,edge2cycle,cycle2cycle)
         
         # finalizing model
         pool_fn = global_add_pool if self.readout == 'sum' else global_mean_pool

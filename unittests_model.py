@@ -4,7 +4,7 @@ import torch
 from objects import MultiScaleData_2, TransferData1, atomspack1
 from ptensors0 import transfer0_0
 from transforms import PreprocessTransform
-from model import Net, ModelLayer, SplitLayer0_1, get_node_encoder, get_edge_encoder, CycleEmbedding1, SplitLayer
+from model import Net, ModelLayer, SplitLayer0_1_complex, get_node_encoder, get_edge_encoder, CycleEmbedding1, SplitLayer
 from torch_geometric.datasets import ZINC
 from torch_geometric.data import Batch
 from torch_geometric.nn import global_add_pool
@@ -80,7 +80,7 @@ class batching(TestCase):
 
         with self.subTest('edge cycle split layer'):
             hidden_dim = 1
-            split_layer = SplitLayer0_1(hidden_dim).eval()
+            split_layer = SplitLayer0_1_complex(hidden_dim).eval()
             # node_encoder = get_node_encoder(hidden_dim,'ZINC').eval()
             edge_encoder = get_edge_encoder(hidden_dim,'ZINC').eval()
             cycle_encoder = CycleEmbedding1(hidden_dim,'ZINC').eval()

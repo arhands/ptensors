@@ -8,3 +8,8 @@ __pycache__/objects.cpython-310.pyc
 tmp/
 .vscode/settings.json
 sam.py
+data_c2c
+*.csv
+*.sh
+graphproperty/processed
+graphproperty/raw

@@ -1,119 +1,77 @@
 import torch
 from torch import Tensor
-from torch.nn import Module, Linear, ReLU, BatchNorm1d
+from torch.nn import Module, Linear, ReLU, BatchNorm1d, Sequential, Parameter
 from objects import TransferData1
-from torch_scatter import scatter_sum
+from ptensors1 import transfer1_1
+from typing import Union
 
-# class LinmapsTransfer1_1(Module):
-#     def __init__(self, hidden_units: int, y_to_x: bool, x_to_x: bool) -> None:
-#         super().__init__()
-#         assert not y_to_x or x_to_x
-
-#         self.y2x = y_to_x
-#         self.x2x = x_to_x
-#         self.hidden_units = hidden_units
-#         omni_slf_dim = 2*hidden_units if y_to_x or x_to_x else hidden_units
-#         omni_dim = 2*hidden_units if y_to_x else hidden_units
-#         self.omni_dim = omni_dim
-#         self.inv_dim = omni_dim*2
-
-#         self.x_sum_lin = Linear(hidden_units,omni_slf_dim + omni_dim,False)
-#         self.x_lin = Linear(hidden_units,omni_slf_dim + omni_dim + hidden_units,False)
-#         self.y_sum_lin = Linear(hidden_units,omni_dim,False)
-#         self.y_lin = Linear(hidden_units,omni_dim,False)
-#         self.msg_bn = BatchNorm1d(omni_dim)
-
-#         self.inv_msg_bn = BatchNorm1d(omni_dim)
-
-#     r"""
-#     Performs both linmaps and transfer operations on both the source and target with "edge updates".
-#     """
-#     def forward(self, x: Tensor, y: Tensor, x_to_y: TransferData1):
-#         # msg (intersect)
-
-#         x_sum = scatter_sum(x,x_to_y.source.domain_indicator,0)
-#         x_sum = self.x_sum_lin(x_sum)
-#         x = self.x_lin(x)
-#         x_msg, x_sum = x_sum[x_to_y.source.domain_indicator,self.omni_dim:] + x
-#         y_sum = scatter_sum(y,x_to_y.target.domain_indicator,0)
-#         y_sum = self.y_lin(y_sum)
-#         y = self.y_lin(y)
-#         y_msg = y_sum[x_to_y.target.domain_indicator] + y
-
-#         msg = x_msg[x_to_y.node_map_edge_index[0]] + y_msg[x_to_y.node_map_edge_index[1]]
-#         msg, int_inv = msg[:,:-self.inv_dim], msg[:,-self.inv_dim:]
-#         int_inv = scatter_sum(int_inv,x_to_y.intersect_indicator,0)
-#         if self.x2x:
-#             msg, x2x = msg[:,self.hidden_units:], msg[:,:self.hidden_units]
-#         msg, int_inv = msg + int_inv[x_to_y.intersect_indicator,self.omni_dim:], int_inv[:,:self.omni_dim]
-
-#         # msg (non-intersect)
-#         x2y_inv_msg = self.inv_msg_bn(
-#             self.inv_msg_x_lin(x_sum)[x_to_y.domain_map_edge_index[0]] + 
-#             self.inv_msg_x_lin(y_sum)[x_to_y.domain_map_edge_index[1]])
-        
-#         # y2x
-#         if self.y2x:
-
-class Transfer1_0(Module):
-    def __init__(self, hidden_units: int) -> None:
+class AffineTransfer1_1(Module):
+    def __init__(self, in_channels: int, out_channels: int, bias: bool = False,
+                 intersect_reduce: str = 'sum', 
+                 domain_reduce: str = 'mean', 
+                 domain_transfer_reduce: str = 'sum', 
+                 intersect_transfer_reduce: str = 'sum') -> None:
+        r"""
+        NOTE: this also considers self linear maps.
+        """
         super().__init__()
-        self.hidden_units = hidden_units
+        self.intersect_reduce = intersect_reduce
+        self.domain_reduce = domain_reduce
+        self.domain_transfer_reduce = domain_transfer_reduce
+        self.intersect_transfer_reduce = intersect_transfer_reduce
 
-        self.x_sum_lin = Linear(hidden_units,hidden_units,False)
-        self.x_int_lin = Linear(hidden_units,hidden_units,False)
-        self.y_lin = Linear(hidden_units,hidden_units*2,False)
-        self.msg_bn = BatchNorm1d(hidden_units)
-
-    r"""
-    Performs both linmaps and transfer operations on both the source and target with "edge updates".
-    """
-    def forward(self, x: Tensor, y: Tensor, x_to_y: TransferData1):
-        # msg
-
-        x_sum = scatter_sum(x,x_to_y.source.domain_indicator,0)
-        x_sum = self.x_sum_lin(x_sum)
-        x_int = scatter_sum(x[x_to_y.node_map_edge_index[0]],x_to_y.intersect_indicator,0)
-        x_int = self.x_int_lin(x_int)
-        x_msg = x_sum[x_to_y.domain_map_edge_index[0]] + x_int
+        self.tf_intersect = Linear(in_channels*3,out_channels,False)
+        self.tf_invariant = Linear(in_channels*2,out_channels,bias)
         
-        y_msg = y[x_to_y.domain_map_edge_index[1]]
-        y_msg = self.y_lin(y_msg)
+        self.linmaps_invariant = Linear(in_channels,out_channels,False)
+        self.linmaps_id = Linear(in_channels,out_channels,False)
+    def forward(self, x: Tensor, data: TransferData1) -> Tensor:
+        (y_int, y_inv), x_inv = transfer1_1(x,data,
+            self.intersect_reduce,
+            self.domain_reduce,
+            self.domain_transfer_reduce,
+            self.intersect_transfer_reduce,
+            False,
+            True
+            )
+        inv_maps = self.linmaps_invariant(x_inv) + self.tf_invariant(y_inv)
+        irred_maps = self.linmaps_id(x) + self.tf_intersect(y_int)
         
-        msg = x_msg + y_msg
-        msg = self.msg_bn(msg).relu()
+        return irred_maps + inv_maps[data.target.domain_indicator]
 
-        res = scatter_sum(msg,x_to_y.domain_map_edge_index[1],0)
-
-        return res
-
-class Transfer0_1(Module):
-    def __init__(self, hidden_units: int) -> None:
+class LinearTransfer1_1_simple(Module):
+    def __init__(self,
+                 intersect_reduce: str = 'sum', 
+                 domain_reduce: str = 'mean', 
+                 domain_transfer_reduce: str = 'sum', 
+                 intersect_transfer_reduce: str = 'sum') -> None:
+        r"""
+        NOTE: this also considers self linear maps.
+        """
         super().__init__()
-        self.hidden_units = hidden_units
+        self.intersect_reduce = intersect_reduce
+        self.domain_reduce = domain_reduce
+        self.domain_transfer_reduce = domain_transfer_reduce
+        self.intersect_transfer_reduce = intersect_transfer_reduce
 
-        self.x_sum_lin = Linear(hidden_units,hidden_units,False)
-        self.x_int_lin = Linear(hidden_units,hidden_units,False)
-        self.x_lin = Linear(hidden_units,hidden_units*2,False)
-        self.msg_bn = BatchNorm1d(hidden_units)
-
-    r"""
-    Performs both linmaps and transfer operations on both the source and target with "edge updates".
-    """
-    def forward(self, x: Tensor, y: Tensor, x_to_y: TransferData1):
-        # msg
-
-        y_sum = scatter_sum(x,x_to_y.source.domain_indicator,0)
-        y_sum = self.x_sum_lin(y_sum)
-        y_int = scatter_sum(x[x_to_y.node_map_edge_index[1]],x_to_y.intersect_indicator,0)
-        y_int = self.x_int_lin(y_int)
-        y_msg = y_sum[x_to_y.domain_map_edge_index[1]] + y_int
+        self.epsilon_rep1 = Parameter(torch.ones(4,requires_grad=True))
+        self.epsilon_rep0 = Parameter(torch.ones(3,requires_grad=True))
         
-        x_msg = x[x_to_y.domain_map_edge_index[0]]
-        x_msg = self.x_lin(x_msg)
+    def forward(self, x: Tensor, data: TransferData1) -> Tensor:
+        (y_int, y_inv), x_inv = transfer1_1(x,data,
+            self.intersect_reduce,
+            self.domain_reduce,
+            self.domain_transfer_reduce,
+            self.intersect_transfer_reduce,
+            False,
+            True
+            )
+        # x1.view(N,k,nc).transpose(2,1).flatten(0,1).mv(w).view(N,nc)
+        nc = x.size(-1)
+        rep1 = torch.cat([y_int,x],-1)
+        rep0 = torch.cat([y_inv,x_inv],-1)
         
-        msg = y_msg + x_msg
-        msg = self.msg_bn(msg).relu()
-
-        return msg
-    
+        rep1 = rep1.view(-1,4,nc).transpose(2,1).flatten(0,1).mv(self.epsilon_rep1).view(-1,nc)
+        rep0 = rep0.view(-1,3,nc).transpose(2,1).flatten(0,1).mv(self.epsilon_rep0).view(-1,nc)
+        
+        return rep1 + rep0[data.target.domain_indicator]

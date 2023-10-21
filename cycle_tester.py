@@ -1,4 +1,6 @@
-from torch_geometric.datasets import ZINC
+import math
+from torch_geometric.datasets import LRGBDataset
+from graph_property import GraphPropertyDataset
 from induced_cycle_finder import get_induced_cycles, from_edge_index
 from tqdm import tqdm
 
@@ -38,11 +40,12 @@ outer_loop = tqdm(['train','val','test'],total=3)
 
 for split in outer_loop:
     outer_loop.set_description_str(split)
-    ds = ZINC('./data/ZINC_base',True,split)
+    ds = LRGBDataset('.','peptides-struct',split)
+    # ds = ZINC('./data/ZINC_base',True,split)
     loop = tqdm(ds,total=len(ds),leave=False,position=1)
     for G in loop:
         neighbors = from_edge_index(G.edge_index,G.num_nodes)
-        induced_cycles = get_induced_cycles(neighbors)
+        induced_cycles = get_induced_cycles(neighbors,math.inf)
         lengths = [len(c.to_list()) for c in induced_cycles]
         if len(lengths) > 0:
             max_length = max(lengths)

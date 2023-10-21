@@ -192,6 +192,11 @@ class MultiScaleData_2(Data):
     edge2cycle_node_map_edge_index: Tensor
     edge2cycle_intersect_indicator: Tensor
     edge2cycle_num_intersections: Union[int,Tensor]
+
+    cycle2cycle_domain_map_edge_index: Tensor
+    cycle2cycle_node_map_edge_index: Tensor
+    cycle2cycle_intersect_indicator: Tensor
+    cycle2cycle_num_intersections: Union[int,Tensor]
     
     def _get_num_cycles(self):
         if isinstance(self.num_cycles,int):
@@ -201,6 +206,8 @@ class MultiScaleData_2(Data):
         return len(self.edge_attr)
     def _get_edge2cycle_num_intersections(self):
         return self.edge2cycle_domain_map_edge_index.size(1)
+    def _get_cycle2cycle_num_intersections(self):
+        return self.cycle2cycle_domain_map_edge_index.size(1)
 
     def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
         if key == 'node2edge_index':
@@ -212,20 +219,24 @@ class MultiScaleData_2(Data):
         elif key == 'cycle_domain_indicator':
             return self._get_num_cycles()
         elif key == 'edge2cycle_node_map_edge_index':
-            return torch.tensor([[len(self.edge_atoms)],[len(self.cycle_atoms)]])
+            return torch.tensor([[len(self.edge_atoms)],[len(self.cycle_atoms)]],device=self.x.device)
         elif key == 'edge2cycle_domain_map_edge_index':
-            return torch.tensor([[self._get_num_edges()],[self._get_num_cycles()]])
+            return torch.tensor([[self._get_num_edges()],[self._get_num_cycles()]],device=self.x.device)
         elif key == 'edge2cycle_intersect_indicator':
             return self._get_edge2cycle_num_intersections()
+        elif key == 'cycle2cycle_node_map_edge_index':
+            return len(self.cycle_atoms)
+        elif key == 'cycle2cycle_domain_map_edge_index':
+            return self._get_num_cycles()
+        elif key == 'cycle2cycle_intersect_indicator':
+            return self._get_cycle2cycle_num_intersections()
         elif key == 'cycle_ind':
             return self.num_nodes
-        elif key == 'edge_batch':
-            return value.max() + 1
-        elif key == 'cycle_batch':
+        elif key in ['cycle_batch','edge_batch']:
             if len(value) > 0:
                 return value.max() + 1
             else:
-                return torch.tensor(1)
+                return torch.tensor(1,device=self.x.device)
         else:
             return super().__inc__(key, value, *args, **kwargs)
     
@@ -282,5 +293,29 @@ class MultiScaleData_2(Data):
             domain_map_edge_index=self.edge2cycle_domain_map_edge_index,
             node_map_edge_index=self.edge2cycle_node_map_edge_index,
             intersect_indicator=self.edge2cycle_intersect_indicator,
+            num_nodes=self.num_nodes,
+        )
+    def set_cycle2cycle(self, cycle2cycle: TransferData1):
+        r"""
+        NOTE: this assumes you will use edge2cycle
+        """
+        
+        self.cycle2cycle_domain_map_edge_index = cycle2cycle.domain_map_edge_index
+        self.cycle2cycle_node_map_edge_index = cycle2cycle.node_map_edge_index
+        self.cycle2cycle_intersect_indicator = cycle2cycle.intersect_indicator
+        self.cycle2cycle_num_intersections = cycle2cycle.domain_map_edge_index.size(1)
+    def get_cycle2cycle(self):
+        num_cycles = self.num_cycles if isinstance(self.num_cycles,int) else torch.sum(self.num_cycles).item()
+        cycles = atomspack1(
+            atoms = self.cycle_atoms,
+            domain_indicator = self.cycle_domain_indicator,
+            num_domains = num_cycles
+        )
+        return TransferData1(
+            source=cycles,
+            target=cycles,
+            domain_map_edge_index=self.cycle2cycle_domain_map_edge_index,
+            node_map_edge_index=self.cycle2cycle_node_map_edge_index,
+            intersect_indicator=self.cycle2cycle_intersect_indicator,
             num_nodes=self.num_nodes,
         )

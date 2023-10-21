@@ -1,8 +1,13 @@
+"""
+abbreviations:
+    - int - intersection between domains
+    - inv - permutation invariant map
+"""
 from __future__ import annotations
 from typing import Callable, Optional, Union
 import torch
 from torch import Tensor
-from torch_scatter import scatter
+from torch_scatter import scatter, scatter_sum
 from torch_geometric.data import Data
 from objects import TransferData1, atomspack1, atomspack2
 
@@ -61,6 +66,69 @@ def transfer0_1_bi_msg(x: Tensor, data: TransferData1, encoder_int: Callable[[Te
         out_inv[data.target.domain_indicator],
     )
 
+def transfter0_1_0_bi_msg_raw(
+        x: Tensor, 
+        y: Tensor, 
+        data: TransferData1, 
+        x_to_x_encoder_int: Callable[[Tensor,Tensor,Tensor],Tensor], 
+        x_to_x_encoder_inv: Callable[[Tensor,Tensor],Tensor], 
+        x_to_y_encoder_int: Callable[[Tensor,Tensor,Tensor],Tensor],
+        x_to_y_encoder_inv: Callable[[Tensor,Tensor],Tensor], reduce: Union[list[str],str]) -> tuple[tuple[Tensor,Tensor],tuple[Tensor,Tensor],Tensor]:
+    r""""
+    params:
+        x: input ptensor 0
+        y: target ptensor 1
+        data: transfer data from x to y
+        x_to_x_encoder_int: update function for messages going from x to y then to x
+        x_to_x_encoder_inv: update function for messages going from x to y then to x
+        x_to_y_encoder_int: update function for messages going from x to y
+        x_to_y_encoder_inv: update function for messages going from x to y
+    
+    NOTE: this is equivalent to calling 'transfer0_1_bi_msg' from x to y, then 'transfer1_0' 
+        back to x and then calling 'transfer0_1_bi_msg' from x to y again to compute messages just going to y, with the slight modification that self messages are removed.
+    """
+    # TODO: add decoders
+    # TODO: make all encoders/decoders optional
+    if isinstance(reduce,str):
+        reduce = [reduce]*3
+
+    x_inv = x[data.domain_map_edge_index[0]]
+    x_int = x_inv[data.intersect_indicator]
+
+    y_int = y[data.node_map_edge_index[1]]
+
+    y_inv = scatter(y,data.target.domain_indicator,0,reduce=reduce[0])
+    y_inv = y_inv[data.domain_map_edge_index[1]]
+    y_inv_int = y_inv[data.intersect_indicator]
+
+    # encoding messages (mapping x to y)
+    x_to_x_encoded_inv_msg = x_to_x_encoder_inv(x_inv,y_inv)
+    x_to_x_encoded_inv = scatter_sum(x_to_x_encoded_inv_msg,data.domain_map_edge_index[1],0)
+
+    x_to_y_encoded_inv_msg = x_to_y_encoder_inv(x_inv,y_inv)
+    y_inv_out = scatter(x_to_y_encoded_inv_msg,data.domain_map_edge_index[1],0,reduce=reduce[1])
+    
+    x_to_x_encoded_int_msg = x_to_x_encoder_int(x_int,y_int,y_inv_int)
+    x_to_x_encoded_int = scatter_sum(x_to_x_encoded_int_msg,data.node_map_edge_index[1],0)
+
+    x_to_y_encoded_int_msg = x_to_y_encoder_int(x_int,y_int,y_inv_int)
+    y_int_out = scatter_sum(x_to_y_encoded_int_msg,data.node_map_edge_index[1],0)
+
+    # decoding messages (mapping back)
+    x_to_x_decoded_inv_msg = x_to_x_encoded_inv[data.domain_map_edge_index[1]]
+    x_to_x_decoded_int_msg = x_to_x_encoded_int[data.node_map_edge_index[1]]
+
+    # removing self messages
+    x_to_x_decoded_inv_msg = x_to_x_decoded_inv_msg - x_to_x_encoded_inv_msg
+    x_to_x_decoded_int_msg = x_to_x_decoded_int_msg - x_to_x_encoded_int_msg
+
+    # aggregating results and returning
+    x_int_out = scatter(x_to_x_decoded_int_msg,data.node_map_edge_index[0],0,reduce=reduce[2])
+    x_inv_out = scatter(x_to_x_decoded_inv_msg,data.domain_map_edge_index[0],0,reduce=reduce[3])
+
+    return (x_int_out,x_inv_out), (y_int_out,y_inv_out), y_int
+
+
 def transfer1_0_msg(x: Tensor, data: TransferData1, encoder_int: Optional[Callable[[Tensor],Tensor]], encoder_inv: Optional[Callable[[Tensor],Tensor]], reduce: Union[list[str],str]='sum'):
     r"""for transfering from a ptensors0 to a ptensors1."""
     if isinstance(reduce,str):
@@ -99,14 +167,26 @@ def transfer1_0(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
         return ret
     return torch.cat(ret,-1)
 
-def transfer1_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum'):
-    r"""for transfering from a ptensors1 to a ptensors1"""
-    if isinstance(reduce,str):
-        reduce = [reduce]*4
+# def transfer1_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='sum', combine_reps: bool = True, return_domain_reduction: bool = False):
+def transfer1_1(
+        x: Tensor, 
+        data: TransferData1, 
+        intersect_reduce: str = 'sum', 
+        domain_reduce: str = 'mean', 
+        domain_transfer_reduce: str = 'sum', 
+        intersect_transfer_reduce: str = 'sum', 
+        combine_reps: bool = True, 
+        return_domain_reduction: bool = False):
+    r"""
+    for transfering from a ptensors1 to a ptensors1
+    - args:
+        + combine_reps: if set to true, will broadcast zeroth order reps to first order and return as single tensor.
+        + return_domain_reduction: if set to true, will return the linmaps0 of the input tensor.
+    """
 
     x_intersect = x[data.node_map_edge_index[0]]
-    x_intersect_reduced = scatter(x_intersect,data.intersect_indicator,0,reduce=reduce[0])
-    x_domain = scatter(x,data.source.domain_indicator,0,reduce=reduce[1])
+    x_intersect_reduced = scatter(x_intersect,data.intersect_indicator,0,reduce=intersect_reduce)
+    x_domain = scatter(x,data.source.domain_indicator,0,reduce=domain_reduce)
     x_invar = torch.cat([
         x_intersect_reduced, # local
         x_domain[data.domain_map_edge_index[0]] # global
@@ -116,11 +196,18 @@ def transfer1_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
             x_intersect, # id
             x_invar[data.intersect_indicator] # (local,global)->local
             ],-1)
-        ,data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[2])
+        ,data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=domain_transfer_reduce)
     y_global_domain = scatter(
             x_invar,
-            data.domain_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[3])
-    return torch.cat([
-        y_local,
-        y_global_domain[data.target.domain_indicator]
-    ],-1)
+            data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=intersect_transfer_reduce)
+    if combine_reps:
+        ret = torch.cat([
+            y_local,
+            y_global_domain[data.target.domain_indicator]
+        ],-1)
+    else:
+        ret = y_local, y_global_domain
+    if return_domain_reduction:
+        return ret, x_domain
+    else:
+        return ret
