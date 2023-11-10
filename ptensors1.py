@@ -211,3 +211,46 @@ def transfer1_1(
         return ret, x_domain
     else:
         return ret
+
+def transfer0_1_minimal(x: Tensor, data: TransferData1):
+    r"""
+    Performs the minimum number of reductions such that the full space of linear maps 
+    is covered if a linmaps operation is performed before and after calling this.
+    """
+    # x = x[data.domain_map_edge_index[0]]
+    # x = x[data.intersect_indicator]
+    # x = x[data.node_map_edge_index[1]]
+    x = x[data.domain_map_edge_index[0][data.intersect_indicator[data.node_map_edge_index[1]]]]
+    return x
+
+def transfer1_1_minimal(x: Tensor, data: TransferData1, reduce: Union[str,list[str]] = 'sum'):
+    r"""
+    Performs the minimum number of reductions such that the full space of linear maps 
+    is covered if a linmaps operation is performed before and after calling this.
+    NOTE: this only has the same representation power for commutative reductions.
+
+    We only consider two maps:
+        - reduce then broadcast on intersection (inv)
+        - identity map for intersection (int)
+    """
+    x = x[data.node_map_edge_index[0]]
+    inv_map = scatter(x,data.intersect_indicator,0,reduce=reduce[0])
+    cat_maps = torch.cat([x,inv_map],-1)
+    y = scatter(cat_maps,data.node_map_edge_index[1],0,reduce=reduce[1])
+    return y
+
+def transfer1_1_minimal(x: Tensor, data: TransferData1, reduce: Union[str,list[str]] = 'sum'):
+    r"""
+    Performs the minimum number of reductions such that the full space of linear maps 
+    is covered if a linmaps operation is performed before and after calling this.
+    NOTE: this only has the same representation power for commutative reductions.
+
+    We only consider two maps:
+        - reduce then broadcast on intersection (inv)
+        - identity map for intersection (int)
+    """
+    x = x[data.node_map_edge_index[0]]
+    inv_map = scatter(x,data.intersect_indicator,0,reduce=reduce[0])
+    cat_maps = torch.cat([x,inv_map],-1)
+    y = scatter(cat_maps,data.node_map_edge_index[1],0,reduce=reduce[1])
+    return y

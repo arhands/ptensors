@@ -48,13 +48,53 @@ class atomspack1(NamedTuple):
             s += f'\t{self.atoms[self.domain_indicator == i].tolist()}\n'
         return s
 
-class atomspack2(atomspack1):
-    atoms2: Tensor
-    domain_indicator2: Tensor
+class atomspack2_minimal(atomspack1):
+    r"""
+    A minimal object for computing scaled dot product attention.
+    """
+    # atoms2: Tensor
+    # domain_indicator2: Tensor
     row_indicator: Tensor
     col_indicator: Tensor
+    # diag_idx: Tensor
+    # transpose_indicator: Tensor
+
+class atomspack2(atomspack2_minimal):
+    atoms2: Tensor
+    domain_indicator2: Tensor
+    # row_indicator: Tensor
+    # col_indicator: Tensor
     diag_idx: Tensor
     transpose_indicator: Tensor
+
+class atomspack3_minimal(atomspack2):
+    r"""
+    A minimal object for computing scaled dot product attention.
+    """
+    # atoms3: Tensor
+    # # diagonals
+    # ij_to_iij_indicator : Tensor
+    # ij_to_iji_indicator : Tensor
+    # ij_to_jii_indicator : Tensor
+    
+    ij_to_ijk_indicator : Tensor
+    ij_to_ikj_indicator : Tensor
+    # ij_to_kij_indicator : Tensor
+
+class atomspack3_strick(atomspack3_minimal):
+    r"""
+    A minimal object for performing "strict" transforms between ptensor 2's and ptensor 3's.
+    "strict" here means we only consider maps with 2nd order equivariance.
+    """
+    atoms3: Tensor
+    # diagonals
+    ij_to_iij_indicator : Tensor
+    ij_to_iji_indicator : Tensor
+    ij_to_jii_indicator : Tensor
+    
+    # ij_to_ijk_indicator : Tensor
+    # ij_to_ikj_indicator : Tensor
+    ij_to_kij_indicator : Tensor
 
 class TransferData0:
     source: atomspack1
@@ -136,7 +176,28 @@ class TransferData1(TransferData0):
             num_nodes,
             intersect_indicator)
 
+class TransferData2(TransferData1):
+    # NOTE: it is required that the messages in 'node_pair_map' and 'node_pair_map_transpose' are so that the messages and the transposed messages align.
 
+    node_pair_map : Tensor
+    """2nd order version of 'node_map_edge_index' for mapping nodes between second order representations."""
+
+    # ii_indicator: Tensor
+    # """indicator for mapping from a first order message rep to root nodes in 2nd order messages."""
+
+    ij_indicator: Tensor
+    """indicator for mapping from a first order message rep to standard nodes in 2nd order messages."""
+
+    node_pair_map_transpose: Tensor
+    """
+        2nd order version of 'node_map_edge_index' for mapping nodes between second order representations.
+        The idea is that this is the same as the 'node_pair_map' map, but it's transposed so that doing the first half of 'node_pair_map' and 
+            following it up with this causes a transposition and visa-versa.
+        This ensures reversability.
+    """
+
+    source : atomspack2
+    target : atomspack2
 
 
 class MultiScaleData(Data):
