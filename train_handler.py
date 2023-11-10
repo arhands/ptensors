@@ -11,11 +11,11 @@ from lightning import Trainer
 #         'ogbg-molhiv' : 'max',
 #     }[ds]
 
-def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: Literal['min','max']) -> tuple[Trainer,int]:
+def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: Literal['min','max'],pos=0,return_logger=False) -> tuple[Trainer,int]:
     callbacks = [
         ModelCheckpoint(root_dir + '/checkpoints/',monitor='val_score',mode=mode,save_top_k=1),
         ModelSummary(4),
-        TQDMProgressBar(refresh_rate=10),
+        TQDMProgressBar(0,pos),
     ]
     if min_lr is not None:
         callbacks.append(EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr))
@@ -29,7 +29,7 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
     version = csv_logger.version
     tb_logger = TensorBoardLogger(root_dir,version=version)
     trainer = Trainer(
-        log_every_n_steps=10,
+        log_every_n_steps=100,
         default_root_dir=root_dir,
         enable_checkpointing=True,
         callbacks= callbacks,
@@ -39,4 +39,6 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
         # reload_dataloaders_every_n_epochs = 100
     )
     #trainer.early_stopping_callback = early_stop_callback # type: ignore
+    if return_logger:
+        return trainer, version, csv_logger
     return trainer, version

@@ -1,6 +1,7 @@
 import math
 from typing import Any, Iterable, List, Literal, Union, Tuple, overload
-from torch_geometric.transforms import BaseTransform, Compose
+from torch_geometric.transforms import BaseTransform, Compose, OneHotDegree, Constant
+from torch_geometric.utils import to_undirected, degree
 from torch_geometric.data import Batch, Data
 from torch_geometric.typing import OptTensor
 from induced_cycle_finder import from_edge_index, get_induced_cycles
@@ -9,6 +10,7 @@ from torch.nn import Identity
 from torch import Tensor
 from objects import TransferData1, MultiScaleData, atomspack1, MultiScaleData_2
 from induced_cycle_finder import get_induced_cycles, from_edge_index
+from data_handler import dataset_type, _tu_datasets, tu_dataset_type
 
 class PreprocessTransform_old(BaseTransform):
     def __init__(self, max_cycle_size: Union[int,float] = math.inf) -> None:
@@ -18,7 +20,6 @@ class PreprocessTransform_old(BaseTransform):
     def __call__(self, data_: Data) -> MultiScaleData:
         data = MultiScaleData()
         data.__dict__.update(data_.__dict__)
-        
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
@@ -39,6 +40,7 @@ class PreprocessTransform_old(BaseTransform):
         ])
         data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
         # getting cycle related maps
+        
         cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes),self.max_cycle_size)
         data.num_cycles = len(cycles)
 
@@ -90,8 +92,47 @@ class ZINCPreprocessor(BaseTransform):
         data.y = data.y.unsqueeze(-1)
         data.edge_attr = data.edge_attr.flatten()
         return data 
+# idx=0
+class TUDatasetPreprocessor(BaseTransform):
+    def __init__(self, ds: str) -> None:
+        super().__init__()
+        self.is_multilabel = ds in ['COLLAB','IMDB-MULTI','ENZYMES']
+        self.ignore_degree = ds == 'REDDIT_BINARY'
+    def __call__(self, data):
+        # global idx
+        # idx += 1
+        # print(idx,flush=True)
+        if data.x is not None:
+            data.x = data.x.argmax(1)
+        else:
+            # data.x = torch.empty(data.num_nodes,dtype=torch.int8) # since we only care about the size.
+            if self.ignore_degree:
+                data.x = torch.zeros(data.num_nodes,dtype=torch.int8)
+            else:
+                data.x = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+        if data.edge_attr is not None:
+            if data.edge_attr.ndim > 1:
+                data.edge_attr = data.edge_attr.argmax(1)
+        else:
+            if self.ignore_degree:
+                data.edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)
+            else:
+                deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+                data.edge_attr = deg[data.edge_index].transpose(1,0)
+            # data.edge_attr = torch.empty(data.edge_index.size(1),dtype=torch.int8) # since we only care about the size.
+        if self.is_multilabel:
+            if data.y.ndim > 1:
+                data.y = data.y.squeeze()
+            assert data.y.ndim == 1
+            data.y = data.y.long()
+        elif data.y.ndim == 1:
+            data.y = data.y.unsqueeze(-1).float()
+        
+        # TODO: find a better way to handle V, maybe.
+        # if data.is_directed:
+        #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
 
-
+        return data
 # class Subgraph(Data):
 #     node_indicator: Tensor
 #     subgraph_indicator: Tensor
@@ -143,7 +184,8 @@ class ZINCPreprocessor(BaseTransform):
 #         # added for debug:
 #         data.num_nodes = len(data.x)
 #         return data
-    
+
+
 class PreprocessTransform(BaseTransform):
     def __init__(self, max_cycle_size: Union[int,float] = math.inf, include_cycle_map: bool = False) -> None:
         super().__init__()
@@ -153,7 +195,7 @@ class PreprocessTransform(BaseTransform):
     def __call__(self, data_: Data) -> MultiScaleData_2:
         data = MultiScaleData_2()
         data.__dict__.update(data_.__dict__)
-        
+        # assert not data_.is_directed()
         edge_index : Tensor = data.edge_index
         num_nodes : int = data.num_nodes
 
@@ -188,7 +230,7 @@ class PreprocessTransform(BaseTransform):
         data.num_nodes = len(data.x)
         return data
 
-def get_pre_transform(ds: Literal['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'],use_old: bool = False,max_cycle_size: Union[int,float] = math.inf, include_cycles2cycles: bool = False, store_device: str = 'cuda'):
+def get_pre_transform(ds: dataset_type,use_old: bool = False,max_cycle_size: Union[int,float] = math.inf, include_cycles2cycles: bool = False, store_device: str = 'cuda'):
     assert not use_old or not include_cycles2cycles
     if ds == 'graphproperty':
         tfs : list[BaseTransform] = [
@@ -197,17 +239,20 @@ def get_pre_transform(ds: Literal['ZINC','ogbg-molhiv','graphproperty','peptides
             PreprocessTransform(max_cycle_size,include_cycles2cycles),
         ]
     else:
+            
         tfs : list[BaseTransform] = [
             PreprocessTransform_old(max_cycle_size) if use_old else 
             PreprocessTransform(max_cycle_size,include_cycles2cycles),
         ]
-        if ds == 'ogbg-molhiv':
+        if ds in _tu_datasets:
+            tfs.insert(0,TUDatasetPreprocessor(ds))
+        elif ds == 'ogbg-molhiv':
             tfs.append(HIVPreprocessor())
-        elif ds == 'ZINC':
+        if ds in ['ZINC','ZINC-Full']:
             tfs.append(ZINCPreprocessor())
     return Compose(tfs)
 
-def get_transform(ds: Literal['ZINC','ogbg-molhiv','graphproperty','ogbg-moltox21','peptides-struct'], target: Literal[0,1,2,None] = None):
+def get_transform(ds: dataset_type, target: Literal[0,1,2,None] = None):
     if ds == 'graphproperty':
         assert target is not None
         return GraphPropertyProcessor(target)

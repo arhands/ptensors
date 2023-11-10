@@ -13,3 +13,4 @@ data_c2c
 *.sh
 graphproperty/processed
 graphproperty/raw
+*.pt

@@ -1,27 +1,68 @@
 from __future__ import annotations
 import torch
-from torch.nn import Module, Parameter, Embedding
+from torch.nn import Module, Parameter, Embedding, EmbeddingBag, Linear
 from torch import Tensor
 from typing import Literal, Union, overload
 from torch_scatter import scatter_sum
 from ogb.graphproppred.mol_encoder import BondEncoder, AtomEncoder
+from data_handler import dataset_type
 
 class DummyEdgeEncoder(Module):
+    r"""
+    Equivalent to torch.nn.Embedding with default options.
+    """
     def __init__(self, hidden_dim: int) -> None:
         super().__init__()
-        self.hidden_dim = hidden_dim
-    def forward(self, edge_attr: Tensor) -> Tensor:
-        return torch.zeros(edge_attr.size(0),self.hidden_dim,device=edge_attr.device)
+        w = torch.normal(0,1,[1,hidden_dim])
+        self.weight = torch.nn.Parameter(w,requires_grad=True)
+    def forward(self, x: Tensor) -> Tensor:
+        return self.weight.broadcast_to(x.size(0),-1)
 
-def get_edge_encoder(hidden_dim: int,ds: Literal['ZINC','ogbg-molhiv','graphproperty','ogbg-moltox21','peptides-struct']) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
-    if ds == 'ZINC':
-        return Embedding(4,hidden_dim)
-    elif ds in ['ogbg-molhiv','ogbg-moltox21','peptides-struct']:
-        return BondEncoder(hidden_dim)
-    elif ds == 'graphproperty':
-        return DummyEdgeEncoder(hidden_dim)
-    else: 
-        raise NameError(f'Dataset {ds} unknown.')
+
+class DummyNodeEncoder(Module):
+    r"""
+    Equivalent to torch.nn.Embedding with default options.
+    """
+    def __init__(self, hidden_dim: int) -> None:
+        super().__init__()
+        # w = torch.normal(0,1,[1,hidden_dim])
+        # self.weight = torch.nn.Parameter(w,requires_grad=True)
+        self.weight = Embedding(1,hidden_dim)
+    def forward(self, x: Tensor) -> Tensor:
+        # return self.weight.broadcast_to(x.size(0),-1)
+        return self.weight(torch.zeros_like(x,dtype=torch.int32))
+
+
+def get_tu_node_encoder(deg_count: int, hidden_dim: int):
+    return Embedding(deg_count,hidden_dim)
+def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
+    return EmbeddingBag(deg_count,hidden_dim)
+
+def get_edge_encoder(hidden_dim: int,ds: dataset_type) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
+    return {
+        'ZINC'              : Embedding(4,hidden_dim)       ,
+        'ZINC-Full'         : Embedding(4,hidden_dim)       ,
+        
+        # OGB/molecular
+        'ogbg-molhiv'       : BondEncoder(hidden_dim)       ,
+        'ogbg-moltox21'     : BondEncoder(hidden_dim)       ,
+        'peptides-struct'   : BondEncoder(hidden_dim)       ,
+
+        # synthetic
+        'graphproperty'     : DummyEdgeEncoder(hidden_dim)  ,
+
+        # TUDatasets
+        'MUTAG'             : Embedding(4,hidden_dim)       ,
+        'ENZYMES'           : get_tu_edge_encoder(10,hidden_dim)  ,
+        'PROTEINS'          : get_tu_edge_encoder(26,hidden_dim)  ,
+        #'COLLAB'            : DummyEdgeEncoder(hidden_dim)  ,
+        'IMDB-MULTI'        : get_tu_edge_encoder(89,hidden_dim)  ,
+        'IMDB-BINARY'       : get_tu_edge_encoder(136,hidden_dim)  ,
+        'REDDIT-BINARY'     : get_tu_edge_encoder(1,hidden_dim)   ,
+        'NCI1'              : get_tu_edge_encoder(5,hidden_dim)  ,
+        'NCI109'            : get_tu_edge_encoder(6,hidden_dim)  ,
+        'PTC_MR'            : Embedding(4,hidden_dim)       ,
+    }[ds]
 
 class GraphPropertyNodeEncoder(Module):
     def __init__(self, hidden_dim: int) -> None:
@@ -33,15 +74,33 @@ class GraphPropertyNodeEncoder(Module):
             self.emb(x[:,0].int()),
             x[:,1].unsqueeze(-1)
         ],-1)
-def get_node_encoder(hidden_dim: int,ds: Literal['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21']) -> Union[AtomEncoder,Embedding,GraphPropertyNodeEncoder]:
-    if ds == 'ZINC':
-        return Embedding(28,hidden_dim)
-    elif ds in ['ogbg-molhiv','ogbg-moltox21','peptides-struct']:
-        return AtomEncoder(hidden_dim)
-    elif ds == 'graphproperty':
-        return GraphPropertyNodeEncoder(hidden_dim)
-    else: 
-        raise NameError(f'Dataset {ds} unknown.')
+def get_node_encoder(hidden_dim: int,ds: dataset_type) -> Union[AtomEncoder,Embedding,GraphPropertyNodeEncoder]:
+    return {
+        'ZINC'              : Embedding(28,hidden_dim)              ,
+        'ZINC-Full'         : Embedding(28,hidden_dim)              ,
+
+        # OGB/Molecular
+        'ogbg-molhiv'       : AtomEncoder(hidden_dim)               ,
+        'ogbg-moltox21'     : AtomEncoder(hidden_dim)               ,
+        'peptides-struct'   : AtomEncoder(hidden_dim)               ,
+
+        # synthetic
+        'graphproperty'     : GraphPropertyNodeEncoder(hidden_dim)  ,
+
+        # TUDatasets
+        'MUTAG'             : Embedding( 7,hidden_dim)              ,
+        'ENZYMES'           : Embedding( 3,hidden_dim)              ,
+        'PROTEINS'          : Embedding( 3,hidden_dim)              ,
+        # 'COLLAB'            : get_tu_node_encoder(hidden_dim)          ,
+        'IMDB-MULTI'        : get_tu_node_encoder(89,hidden_dim)          ,
+        'IMDB-BINARY'       : get_tu_node_encoder(136,hidden_dim)          ,
+        'REDDIT-BINARY'     : get_tu_node_encoder(1,hidden_dim)       ,
+        'NCI1'              : Embedding(37,hidden_dim)              ,
+        'NCI109'            : Embedding(38,hidden_dim)              ,
+        'PTC_MR'            : Embedding(18,hidden_dim)              ,
+    }[ds]
+    
+
 
 # class AffineSum(Module):
 #     def __init__(self, epsilon : float =0.5) -> None:
@@ -51,7 +110,7 @@ def get_node_encoder(hidden_dim: int,ds: Literal['ZINC','ogbg-molhiv','graphprop
 #         return self.epsilon * x + (1 - self.epsilon) * y
 
 class CycleEmbedding0(Module):
-    def __init__(self, hidden_dim: int, ds: Literal['ZINC','ogbg-molhiv']) -> None:
+    def __init__(self, hidden_dim: int, ds: dataset_type) -> None:
         super().__init__()
         self.emb = get_node_encoder(hidden_dim,ds)
     def forward(self, x: Tensor, atom_to_cycle: Tensor):
@@ -59,7 +118,7 @@ class CycleEmbedding0(Module):
         return scatter_sum(x[atom_to_cycle[0]],atom_to_cycle[1],0)
 
 class CycleEmbedding1(Module):
-    def __init__(self, hidden_dim: int, ds: Literal['ZINC','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21']) -> None:
+    def __init__(self, hidden_dim: int, ds: dataset_type) -> None:
         super().__init__()
         self.emb = get_node_encoder(hidden_dim,ds)
         self.epsilon = Parameter(torch.tensor(0.,requires_grad=True))

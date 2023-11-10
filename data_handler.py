@@ -1,14 +1,23 @@
 import math
-from typing import Literal
+from typing import Literal, Union
 import lightning.pytorch as pl
-from torch_geometric.datasets import ZINC, LRGBDataset
+from torch_geometric.datasets import ZINC, LRGBDataset, TUDataset
 from ogb.graphproppred import PygGraphPropPredDataset
 # from transforms import PreprocessTransform_4 as PreprocessTransform
 from torch_geometric.loader import DataLoader
 from graph_property import GraphPropertyDataset
 
+from sklearn.model_selection import StratifiedKFold
+import numpy as np
+
+_tu_datasets = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
+tu_dataset_type = Literal['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
+dataset_type = Union[
+    Literal['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21'],tu_dataset_type
+    ]
+
 class DataHandler(pl.LightningDataModule):
-    def __init__(self, root: str, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, dataset: Literal['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21'], pre_transform, transform) -> None:
+    def __init__(self, root: str, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, dataset: dataset_type, pre_transform, transform, num_folds=None, seed=0) -> None:
         super().__init__()
         # self.transform = PreprocessTransform()
         self.pre_transform = pre_transform
@@ -25,7 +34,10 @@ class DataHandler(pl.LightningDataModule):
             dataset = 'ZINC'
         else:
             self.subset = True
-        self.ds_name : Literal['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'] = dataset
+        self.ds_name : dataset_type = dataset
+
+        self.num_folds : int = num_folds #type: ignore
+        self.seed : int = seed #type: ignore
         # self.pre_move_to_device = pre_move_to_device
     def prepare_data(self) -> None:
         if self.ds_name == 'ZINC':
@@ -39,11 +51,26 @@ class DataHandler(pl.LightningDataModule):
         elif self.ds_name == 'peptides-struct':
             for split in ['train','val','test']:
                 LRGBDataset(self.root,self.ds_name,split,self.transform,self.pre_transform)
+        elif self.ds_name in _tu_datasets:
+            # for split in ['train','val','test']:
+            TUDataset(self.root,self.ds_name,self.transform,self.pre_transform,use_edge_attr=True,use_node_attr=True)
         else:
             raise NotImplementedError(f'Dataset prepare for "{self.ds_name}" not implemented.')
         # return super().prepare_data()
+    def set_fold_idx(self, idx: int):
+        if hasattr(self,'split_indices'):
+            # adapted from GIN.
+            train_idx, test_idx = self.split_indices[idx]
+            self.splits = {
+                'train' : self.ds[train_idx],
+                'val' : self.ds[test_idx],
+                'test' : self.ds[test_idx],
+            }
+        else:
+            self.init_split_idx = idx
     def _get_dataloader(self, split: Literal['train','val','test'],shuffle: bool=False):
-        return DataLoader(self.splits[split],self.batch_size[split],shuffle,num_workers=4,pin_memory=True,pin_memory_device=self.device,prefetch_factor=3) #type: ignore
+        return DataLoader(self.splits[split],self.batch_size[split],shuffle) #type: ignore
+        # return DataLoader(self.splits[split],self.batch_size[split],shuffle,num_workers=4,pin_memory=True,pin_memory_device=self.device,prefetch_factor=3) #type: ignore
     def setup(self, stage: Literal['fit','test','predict']):
         if self.ds_name == 'ZINC':
             self.splits = {
@@ -77,6 +104,15 @@ class DataHandler(pl.LightningDataModule):
                 split : LRGBDataset(self.root,self.ds_name,split,self.transform,self.pre_transform) 
                 for split in ['train','val','test']
             }
+        elif self.ds_name in _tu_datasets:
+            # adapted from GIN
+            ds = TUDataset(self.root,self.ds_name,self.transform,self.pre_transform,use_edge_attr=True,use_node_attr=True)
+            skf = StratifiedKFold(self.num_folds,shuffle=True,random_state=self.seed)
+            self.split_indices = list(skf.split(np.zeros(len(ds)),ds.y))
+            self.ds = ds
+            if hasattr(self,'init_split_idx'):
+                self.set_fold_idx(self.init_split_idx)
+                del self.init_split_idx
         else:
             raise NotImplementedError(f'Dataset setup for "{self.ds_name}" not implemented.')
     

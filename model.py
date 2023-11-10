@@ -8,6 +8,7 @@ from torch_scatter import scatter_sum
 from objects import MultiScaleData_2, TransferData1
 from ptensors1 import linmaps1_1, transfer0_1, transfer1_0
 from torch.nn import functional as F
+from data_handler import dataset_type
 
 from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding1
 from ptensors1_modules import AffineTransfer1_1, LinearTransfer1_1_simple
@@ -264,12 +265,27 @@ class ModelLayer(Module):
 
         return node_out, edge_out, cycle_out
 
+def get_out_dim(ds: dataset_type) -> int:
+    multi = {
+        'ogbg-moltox21'     : 12,
+        'peptides-struct'   : 11,
+
+        # tudatasets
+        'ENZYMES'           : 6 ,
+        'COLLAB'            : 3 ,
+        'IMDB-MULTI'        : 3 ,
+
+    }
+    if ds in multi:
+        return multi[ds]
+    else:
+        return 1
 
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: Literal['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'], readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str, include_cycle2cycle: bool = False) -> None:
+    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: dataset_type, readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str, include_cycle2cycle: bool = False) -> None:
         super().__init__()
         assert readout in ['mean','sum']
-        assert dataset in ['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'], dataset
+        # assert dataset in ['ZINC','ogbg-molhiv','graphproperty','peptides-struct','ogbg-moltox21'], dataset
         # Initialization layers
         self.atom_encoder = get_node_encoder(hidden_dim,dataset)
         self.edge_encoder = get_edge_encoder(hidden_dim,dataset)
@@ -285,13 +301,7 @@ class Net(Module):
             BatchNorm1d(hidden_dim*2,eps,momentum),
             ReLU(True),
         ) for _ in range(3)])
-        if dataset == 'ogbg-moltox21':
-            out_dim = 12
-        elif dataset == 'peptides-struct':
-            out_dim = 11
-        else:
-            out_dim = 1
-        self.lin = Linear(hidden_dim*2,out_dim)
+        self.lin = Linear(hidden_dim*2,get_out_dim(dataset))
 
         self.dropout = dropout
     def forward(self, data: MultiScaleData_2) -> Tensor:
