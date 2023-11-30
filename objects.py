@@ -33,14 +33,18 @@ class atomspack1(NamedTuple):
         # ])
     
     @classmethod
-    def from_list(cls, ls: list[list[int]]):
+    def from_tensor_list(cls, ls: list[Tensor]):
         if len(ls) > 0:
-            atoms = torch.cat([torch.tensor(v) for v in ls])
+            atoms = torch.cat(ls)
             domain_indicator = torch.cat([torch.tensor([idx]).broadcast_to(len(v)) for idx, v in enumerate(ls)])
         else:
             atoms = torch.empty(0,dtype=torch.int64)
             domain_indicator = torch.empty(0,dtype=torch.int64)
         return cls(atoms,domain_indicator,len(ls))
+
+    @classmethod
+    def from_list(cls, ls: list[list[int]]):
+        return cls.from_tensor_list([torch.tensor(v) for v in ls])
     
     def __str__(self) -> str:
         s = 'atoms:\n'
@@ -58,6 +62,8 @@ class atomspack2_minimal(atomspack1):
     col_indicator: Tensor
     # diag_idx: Tensor
     # transpose_indicator: Tensor
+    def get_num_atoms2(self):
+        return len(self.row_indicator)
 
 class atomspack2(atomspack2_minimal):
     atoms2: Tensor

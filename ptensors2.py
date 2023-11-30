@@ -4,15 +4,17 @@ import torch
 from torch import Tensor
 from torch_scatter import scatter
 from torch_geometric.data import Data
-from objects import TransferData1, TransferData2, atomspack1, atomspack2
+from objects import TransferData1, TransferData2, atomspack1, atomspack2, atomspack2_minimal
 from ptensors1 import linmaps1_0, linmaps0_1, transfer0_1
 
 def linmaps0_2(x: Tensor, domains: atomspack2):
-    full_broadcast = x[domains.atoms2]
-    diag_broadcast = torch.zeros_like(full_broadcast)
-    diag_broadcast[domains.diag_idx] = x[domains.atoms]
+    # full_broadcast = x[domains.atoms2]
+    first_order_rep = x[domains.domain_indicator]
+    diag_broadcast = torch.zeros(
+        domains.get_num_atoms2(),device=x.device)
+    diag_broadcast[domains.diag_idx] = diag_broadcast
     return torch.cat([
-        full_broadcast,
+        first_order_rep[domains.col_indicator],
         diag_broadcast
     ],-1)
 
@@ -21,7 +23,8 @@ def linmaps2_0(x: Tensor, domains: atomspack2, reduce: Union[list[str],str]='sum
     if isinstance(reduce,str):
         reduce = [reduce]*2
     return torch.cat([
-        scatter(x,domains.domain_indicator2,0,reduce=reduce[0]),
+        # scatter(x,domains.domain_indicator2,0,reduce=reduce[0]),
+        scatter(x,domains.domain_indicator[domains.col_indicator],0,reduce=reduce[0]),
         scatter(x[domains.diag_idx],domains.domain_indicator,0,reduce=reduce[1]),
     ],-1)
 
@@ -86,7 +89,7 @@ def transfer0_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
     """
     msgs = x[data.node_map_edge_index[0][data.intersect_indicator]]
     msgs_ij = msgs[data.ij_indicator]
-    y_transpose = scatter(msgs_ij,data.node_pair_map_transpose[1],0,dim_size=len(data.target.atoms2),reduce=reduce[0])
+    y_transpose = scatter(msgs_ij,data.node_pair_map_transpose[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[0])
 
     roots = x[data.ii_indicator]
 
@@ -94,7 +97,7 @@ def transfer0_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
         scatter(torch.cat([
             msgs_ij,
             roots,
-        ],-1),data.node_pair_map_transpose[1],0,dim_size=len(data.target.atoms2),reduce=reduce[1]),
+        ],-1),data.node_pair_map_transpose[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[1]),
         y_transpose
         ],-1)
     return y
@@ -116,9 +119,9 @@ def transfer1_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
 
 
     # we exclude the invariant part to avoid duplication.
-    y_ji = scatter(msgs_ij_inv[:,:x.size(1)],data.node_pair_map_transpose[1],0,dim_size=len(data.target.atoms2),reduce=reduce[1])
+    y_ji = scatter(msgs_ij_inv[:,:x.size(1)],data.node_pair_map_transpose[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[1])
     # TODO: figure out if we actually save time by performing multiple smaller scatter operations instead of a few big ones.
-    y_ij_inv = scatter(msgs_ij_inv,data.node_pair_map[1],0,dim_size=len(data.target.atoms2),reduce=reduce[2])
+    y_ij_inv = scatter(msgs_ij_inv,data.node_pair_map[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[2])
 
     y_i_inv = scatter(msgs_i_inv,data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[3])
     y_ii_inv = y_i_inv[data.target.diag_idx]
@@ -151,7 +154,7 @@ def transfer2_1_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
 
     y = scatter(
         torch.cat([msg_1,msg_0[data.intersect_indicator]],-1)
-        ,data.node_pair_map[1],0,dim_size=len(data.target.atoms2),reduce=reduce[1])
+        ,data.node_pair_map[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[1])
     
     return y
 
@@ -198,7 +201,7 @@ def transfer2_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
     y_1 = y_01[:,:3*x.size(1)] # 3 maps
     
     # both strictly second order maps
-    y_2 = scatter(msg_ij_ji,data.node_pair_map[1],0,dim_size=len(data.target.atoms2),reduce=reduce[4])
+    y_2 = scatter(msg_ij_ji,data.node_pair_map[1],0,dim_size=data.target.get_num_atoms2(),reduce=reduce[4])
 
     y_012 = torch.cat([
         y_01[data.target.diag_idx], # 5 maps

@@ -45,17 +45,18 @@ class PreprocessTransform_old(BaseTransform):
         data.num_cycles = len(cycles)
 
         if len(cycles) > 0:
-
             cycles = [c.to_list() for c in cycles]
             cycles_ap = atomspack1.from_list(cycles)
-
             
             edges_to_cycles : TransferData1 = TransferData1.from_atomspacks(edges,cycles_ap,True)
             data.edge2cycle_index = edges_to_cycles.domain_map_edge_index
             
             data.cycle_batch = torch.zeros(len(cycles),dtype=torch.int64)
             
-            data.node2cycle_index = torch.stack([cycles_ap.atoms,cycles_ap.domain_indicator])
+            data.node2cycle_index = torch.stack([
+                cycles_ap.atoms,
+                cycles_ap.domain_indicator
+            ])
         else:
             
             data.edge2cycle_index = torch.empty(2,0,dtype=torch.int64)
