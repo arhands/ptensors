@@ -44,7 +44,46 @@ def profile_random_graph_khoods(num_nodes: int, edge_prob: float, num_hops: int,
         backward_history.append(t2 - t1)
     return forward_history, backward_history
 
-forw, backw = profile_random_graph_khoods(64,0.05,4,32,20)
+def profile_random_domains(num_nodes: int, ptensor_size: int, num_ptensors: int, num_channels, num_rounds: int) -> Tensor:
+    # getting subgraphs
+    # return
+    subg = [
+        torch.randperm(num_nodes)[:ptensor_size]
+        for idx in range(num_ptensors)
+    ]
+    print(min(len(k) for k in subg))
+    features = torch.rand(num_nodes,num_channels,device='cuda')
+
+    # preprocessing
+    subgraphs = atomspack2.from_tensor_list(subg)
+    transfer = TransferData2.from_atomspacks(subgraphs,subgraphs)
+    transfer.to('cuda')
+    features2 = linmaps0_2(features,subgraphs)
+    features2.requires_grad = True
+    print("preprocessing complete.")
+    # test = torch.compile(transfer2_2_minimal_large_ptensors)
+    # transfer = TransferData2.from_atomspacks(subgraphs,subgraphs,False)
+    
+
+    # running tests
+    forward_history = []
+    backward_history = []
+    
+    for _ in range(num_rounds):
+        features2_ = features2.clone()
+        t0 = monotonic()
+        # y = test(features2_,transfer)
+        y = transfer2_2_minimal_large_ptensors(features2_,transfer)
+        t1 = monotonic()
+        y.sum().sigmoid().backward()
+        t2 = monotonic()
+        torch.cuda.empty_cache()
+        forward_history.append(t1 - t0)
+        backward_history.append(t2 - t1)
+    return forward_history, backward_history
+
+# forw, backw = profile_random_graph_khoods(2,0.05,4,32,20)
+forw, backw = profile_random_domains(256,64,8,128,20)
 
 print(forw)
 print(backw)
