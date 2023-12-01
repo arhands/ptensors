@@ -6,14 +6,14 @@ from torch_scatter import scatter
 from torch_geometric.data import Data
 from objects import TransferData1, atomspack1
 from ptensors1 import linmaps1_0, linmaps0_1, transfer0_1
-from ptensors2 import TransferData2, atomspack2, atomspack2_minimal
+from objects2 import TransferData2, atomspack2, atomspack2_minimal
 
 def linmaps0_2(x: Tensor, domains: atomspack2):
     # full_broadcast = x[domains.atoms2]
     first_order_rep = x[domains.domain_indicator]
     diag_broadcast = torch.zeros(
-        domains.get_num_atoms2(),device=x.device)
-    diag_broadcast[domains.diag_idx] = diag_broadcast
+        domains.get_num_atoms2(),x.size(1),dtype=x.dtype,device=x.device)
+    diag_broadcast[domains.diag_idx] = first_order_rep
     return torch.cat([
         first_order_rep[domains.col_indicator],
         diag_broadcast
@@ -172,7 +172,7 @@ def transfer2_2_minimal_large_ptensors(x: Tensor, data: TransferData2, reduce: U
     msg_ii = x_ii[data.node_map_edge_index[0]]
     
     # sum of rows and columns
-    msg_i_j = scatter(msg_ij_ji,data.ij_indicator,0,reduce=reduce[0])
+    msg_i_j = scatter(msg_ij_ji,data.ij_indicator,0,dim_size=len(msg_ii),reduce=reduce[0])
 
     #all three first order messages
     msg_i_j_ii = torch.cat([msg_i_j,msg_ii],-1)

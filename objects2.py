@@ -67,7 +67,10 @@ class atomspack2_minimal(atomspack1):
     # transpose_indicator: Tensor
     def get_num_atoms2(self):
         return len(self.row_indicator)
-
+    def to(self,device):
+        super().to(device)
+        self.row_indicator = self.row_indicator.to(device)
+        self.col_indicator = self.col_indicator.to(device)
     @classmethod
     def from_tensor_list(cls, ls: list[Tensor]):
         inst = atomspack1.from_tensor_list(ls)
@@ -101,7 +104,10 @@ class atomspack2(atomspack2_minimal):
         super().__init__(atoms, domain_indicator, num_domains, row_indicator, col_indicator)
         self.diag_idx = diag_idx
         self.transpose_indicator = transpose_indicator
-    
+    def to(self,device):
+        super().to(device)
+        self.diag_idx = self.diag_idx.to(device)
+        self.transpose_indicator = self.transpose_indicator.to(device)
     @classmethod
     def from_tensor_list(cls, ls: list[Tensor]):
         inst = atomspack2_minimal.from_tensor_list(ls)
@@ -123,18 +129,18 @@ class atomspack2(atomspack2_minimal):
             row_indicator = rows,
             col_indicator = cols,
             diag_idx = diag_idx,
-            transpose = transpose,
+            transpose_indicator = transpose,
         )
     
     # the following are things that we only need for preprocessing.
-    _atoms2: Optional[Tensor]
+    _atoms2: Optional[Tensor] = None
     r"""An indexing for the tuples of atoms. 
         Meaning, for every pair of atom indices (i,j),
         is the value in _atoms2[k] = i*num_nodes + j
         iff k in the 2nd order rep corrosponds to an
         occurence of (i,j).
     """
-    _domains_indicator2: Optional[Tensor]
+    _domains_indicator2: Optional[Tensor] = None
     
     def get_atoms2(self, num_nodes: Optional[int] = None) -> Tensor:
         if self._atoms2 is None:
@@ -145,9 +151,9 @@ class atomspack2(atomspack2_minimal):
 
     def get_domains_indicator2(self) -> Tensor:
         # TODO: Is it actually worth caching this??
-        if self._domains2 is None:
-            self._domains2 = self.domain_indicator[self.col_indicator]
-        return self._domains2
+        if self._domains_indicator2 is None:
+            self._domains_indicator2 = self.domain_indicator[self.col_indicator]
+        return self._domains_indicator2
 
 class TransferData2(TransferData1):
 
@@ -162,19 +168,31 @@ class TransferData2(TransferData1):
 
     source : atomspack2
     target : atomspack2
-
+    def to(self,device):
+        super().to(device)
+        self.node_pair_map = self.node_pair_map.to(device)
+        self.ij_indicator = self.ij_indicator.to(device)
     def __init__(self, source, target, domain_map_edge_index, node_map_edge_index, num_nodes, intersect_indicator, node_pair_map, ij_indicator):
         super().__init__(source, target, domain_map_edge_index, node_map_edge_index, num_nodes, intersect_indicator)
         self.node_pair_map = node_pair_map
         self.ij_indicator = ij_indicator
 
+    # def from_atomspacks(cls, source: atomspack2, target: atomspack2, ensure_sources_subgraphs: bool):
     @classmethod
-    def from_atomspacks(cls, source: atomspack2, target: atomspack2, ensure_sources_subgraphs: bool):
-        sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
+    def from_atomspacks(cls, source: atomspack2, target: atomspack2):
+        sub = TransferData1.from_atomspacks(source,target)
+        # sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
+        sub = TransferData1.from_atomspacks(source,target)
+        # sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
         
         source_reduction = atomspack1(source.get_atoms2(sub.num_nodes),source.get_domains_indicator2(),source.num_domains)
         target_reduction = atomspack1(target.get_atoms2(sub.num_nodes),target.get_domains_indicator2(),target.num_domains)
-        transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction,ensure_sources_subgraphs)
+        print(source.col_indicator.size())
+        print(source.get_atoms2().size())
+        transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction)
+        print(transfer_data1_reduction.node_map_edge_index.size())
+        print(transfer_data1_reduction.intersect_indicator.size())
+        # transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction,ensure_sources_subgraphs)
         
         # TODO: make sure transpose_indicator is consistent with this mapping.
         # I wrote it to be, it'd just be nice to sanity check it. :)
