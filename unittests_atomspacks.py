@@ -12,7 +12,7 @@ class atomspack(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        overlaps = b.overlaps(a,True)
+        overlaps = b.overlaps1(a,True)
         expected_overlaps = torch.tensor([
             [0,1,2,2,3,3,4,5],
             [0,1,1,3,2,4,3,5]

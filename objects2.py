@@ -59,6 +59,10 @@ class atomspack2_minimal(atomspack1):
     # domain_indicator2: Tensor
     row_indicator: Tensor
     col_indicator: Tensor
+    def __init__(self, atoms, domain_indicator, num_domains, row_indicator, col_indicator) -> None:
+        super().__init__(atoms, domain_indicator, num_domains)
+        self.row_indicator = row_indicator
+        self.col_indicator = col_indicator
     # diag_idx: Tensor
     # transpose_indicator: Tensor
     def get_num_atoms2(self):
@@ -76,44 +80,76 @@ class atomspack2_minimal(atomspack1):
             cols = torch.empty(0,dtype=torch.int64)
 
         return cls(
-            # domain_indicator = inst.domain_indicator,
-            # atoms = inst.atoms,
-            **inst,
+            domain_indicator = inst.domain_indicator,
+            atoms = inst.atoms,
+            num_domains = inst.num_domains,
             row_indicator = rows,
             col_indicator = cols,
         )
     
 
 
+
 class atomspack2(atomspack2_minimal):
-    atoms2: Tensor
+    # atoms2: Tensor
     # domain_indicator2: Tensor
     # row_indicator: Tensor
     # col_indicator: Tensor
     diag_idx: Tensor
     transpose_indicator: Tensor
+    def __init__(self, atoms, domain_indicator, num_domains, row_indicator, col_indicator, diag_idx, transpose_indicator) -> None:
+        super().__init__(atoms, domain_indicator, num_domains, row_indicator, col_indicator)
+        self.diag_idx = diag_idx
+        self.transpose_indicator = transpose_indicator
     
     @classmethod
     def from_tensor_list(cls, ls: list[Tensor]):
         inst = atomspack2_minimal.from_tensor_list(ls)
+        rows, cols = inst.row_indicator, inst.col_indicator
         if len(ls) > 0:
             # constructs the elements in the atomspack1
-            rows, cols = inst.row_indicator, inst.col_indicator
             diag_idx = (rows == cols).argwhere()[:,0]
             transpose = _get_transpose_indicator(ls)
 
         else:
             diag_idx = torch.empty(0,dtype=torch.int64)
             transpose = torch.empty(0,dtype=torch.int64)
+        
 
         return cls(
-            **inst,
+            domain_indicator = inst.domain_indicator,
+            atoms = inst.atoms,
+            num_domains = inst.num_domains,
+            row_indicator = rows,
+            col_indicator = cols,
             diag_idx = diag_idx,
             transpose = transpose,
         )
+    
+    # the following are things that we only need for preprocessing.
+    _atoms2: Optional[Tensor]
+    r"""An indexing for the tuples of atoms. 
+        Meaning, for every pair of atom indices (i,j),
+        is the value in _atoms2[k] = i*num_nodes + j
+        iff k in the 2nd order rep corrosponds to an
+        occurence of (i,j).
+    """
+    _domains_indicator2: Optional[Tensor]
+    
+    def get_atoms2(self, num_nodes: Optional[int] = None) -> Tensor:
+        if self._atoms2 is None:
+            assert num_nodes is not None
+            self._atoms2 = num_nodes*self.atoms[self.row_indicator] + self.atoms[self.col_indicator]
+        return self._atoms2
+            
+
+    def get_domains_indicator2(self) -> Tensor:
+        # TODO: Is it actually worth caching this??
+        if self._domains2 is None:
+            self._domains2 = self.domain_indicator[self.col_indicator]
+        return self._domains2
 
 class TransferData2(TransferData1):
-    # NOTE: it is required that the messages in 'node_pair_map' and 'node_pair_map_transpose' are so that the messages and the transposed messages align.
 
     node_pair_map : Tensor
     """2nd order version of 'node_map_edge_index' for mapping nodes between second order representations."""
@@ -124,13 +160,32 @@ class TransferData2(TransferData1):
     ij_indicator: Tensor
     """indicator for mapping from a first order message rep to standard nodes in 2nd order messages."""
 
-    node_pair_map_transpose: Tensor
-    """
-        2nd order version of 'node_map_edge_index' for mapping nodes between second order representations.
-        The idea is that this is the same as the 'node_pair_map' map, but it's transposed so that doing the first half of 'node_pair_map' and 
-            following it up with this causes a transposition and visa-versa.
-        This ensures reversability.
-    """
-
     source : atomspack2
     target : atomspack2
+
+    def __init__(self, source, target, domain_map_edge_index, node_map_edge_index, num_nodes, intersect_indicator, node_pair_map, ij_indicator):
+        super().__init__(source, target, domain_map_edge_index, node_map_edge_index, num_nodes, intersect_indicator)
+        self.node_pair_map = node_pair_map
+        self.ij_indicator = ij_indicator
+
+    @classmethod
+    def from_atomspacks(cls, source: atomspack2, target: atomspack2, ensure_sources_subgraphs: bool):
+        sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
+        
+        source_reduction = atomspack1(source.get_atoms2(sub.num_nodes),source.get_domains_indicator2(),source.num_domains)
+        target_reduction = atomspack1(target.get_atoms2(sub.num_nodes),target.get_domains_indicator2(),target.num_domains)
+        transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction,ensure_sources_subgraphs)
+        
+        # TODO: make sure transpose_indicator is consistent with this mapping.
+        # I wrote it to be, it'd just be nice to sanity check it. :)
+        
+        return cls(
+            source, 
+            target, 
+            sub.domain_map_edge_index, 
+            sub.node_map_edge_index, 
+            sub.num_nodes, 
+            sub.intersect_indicator, 
+            transfer_data1_reduction.node_map_edge_index, 
+            transfer_data1_reduction.intersect_indicator
+        )

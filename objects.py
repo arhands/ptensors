@@ -5,13 +5,16 @@ from torch import Tensor
 from torch_geometric.data import Data
 from torch_scatter import scatter_add
 
-class atomspack1(NamedTuple):
+class atomspack1:
     atoms: Tensor
     r"""The atoms across all domains"""
     domain_indicator: Tensor
     num_domains: int
-    
-    def overlaps(self, other: atomspack1, ensure_source_subgraphs: bool):
+    def __init__(self,atoms,domain_indicator,num_domains) -> None:
+        self.atoms = atoms
+        self.domain_indicator = domain_indicator
+        self.num_domains = num_domains
+    def overlaps1(self, other: atomspack1, ensure_source_subgraphs: bool):
         r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
         if len(self.atoms) == 0 or len(other.atoms) == 0:
             return torch.empty(2,0,dtype=torch.int64)
@@ -150,7 +153,7 @@ class TransferData1(TransferData0):
     @classmethod
     def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
         # computing nodes in the target domains that are intersected with.
-        overlaps = source.overlaps(target,ensure_sources_subgraphs)
+        overlaps = source.overlaps1(target,ensure_sources_subgraphs)
         source_domains = source.domain_indicator[overlaps[0]]
         target_domains = target.domain_indicator[overlaps[1]]
         
