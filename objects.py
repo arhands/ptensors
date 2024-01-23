@@ -17,57 +17,57 @@ class atomspack1:
         self.atoms = atoms
         self.domain_indicator = domain_indicator
         self.num_domains = num_domains
-    # def overlaps1(self, other: atomspack1, ensure_source_subgraphs: bool):
-    #     r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
-    #     if len(self.atoms) == 0 or len(other.atoms) == 0:
-    #         return torch.empty(2,0,dtype=torch.int64)
-    #     # NOTE: This is not super efficient, but python overhead is O(1)!
-    #     incidence = self.atoms.unsqueeze(1) == other.atoms.unsqueeze(0)
-    #     if ensure_source_subgraphs:
-    #         incidence_domains = scatter_add(incidence.int(),self.domain_indicator,0)
-    #         incidence_domains = scatter_add(incidence_domains,other.domain_indicator,1)
-    #         source_domain_size = scatter_add(torch.ones_like(self.domain_indicator),self.domain_indicator,0)
-    #         incidence_mask_domain = incidence_domains == source_domain_size.unsqueeze(1)
-    #         incidence_mask = incidence_mask_domain[self.domain_indicator][:,other.domain_indicator]
-
-    #         incidence[~incidence_mask] = False
-    #     incidence = incidence.to_sparse_coo().coalesce()
-    #     return incidence.indices()
-    def overlaps1(self, other: atomspack1):
+    def overlaps1(self, other: atomspack1, ensure_source_subgraphs: bool):
         r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
         if len(self.atoms) == 0 or len(other.atoms) == 0:
             return torch.empty(2,0,dtype=torch.int64)
-        # self_unique_atoms, self_unique_inverse = self.atoms.unique(True,True)
-        self_unique_atoms = self.atoms.unique()
-        # other_unique_atoms, other_unique_inverse = other.atoms.unique(True,True)
-        other_unique_atoms = other.atoms.unique()
-        i = 0
-        j = 0
-        incidence_unique_indices = []
-        while i < len(self_unique_atoms) and j < len(other_unique_atoms):
-            if self_unique_atoms[i] > other_unique_atoms[j]:
-                j += 1
-            elif self_unique_atoms[i] < other_unique_atoms[j]:
-                i += 1
-            else:
-                incidence_unique_indices.append(self_unique_atoms[i])
-                i += 1
-                j += 1
-        
-        # now, we iterate through the incidence indices:
-        incidences = []
-        for i in incidence_unique_indices:
-            self_inc = torch.argwhere(self.atoms == i).flatten()
-            other_inc = torch.argwhere(other.atoms == i).flatten()
+        # NOTE: This is not super efficient, but python overhead is O(1)!
+        incidence = self.atoms.unsqueeze(1) == other.atoms.unsqueeze(0)
+        if ensure_source_subgraphs:
+            incidence_domains = scatter_add(incidence.int(),self.domain_indicator,0)
+            incidence_domains = scatter_add(incidence_domains,other.domain_indicator,1)
+            source_domain_size = scatter_add(torch.ones_like(self.domain_indicator),self.domain_indicator,0)
+            incidence_mask_domain = incidence_domains == source_domain_size.unsqueeze(1)
+            incidence_mask = incidence_mask_domain[self.domain_indicator][:,other.domain_indicator]
 
-            # getting every combination
-            self_inc = self_inc.unsqueeze(-1).broadcast_to(self_inc.size(0),other_inc.size(0))
-            other_inc = other_inc.unsqueeze(0).broadcast_to(self_inc.size())
-            self_inc = self_inc.flatten()
-            other_inc = other_inc.flatten()
-            incidences.append(torch.stack([self_inc,other_inc]))
-        incidences = torch.cat(incidences,-1)
-        return incidences
+            incidence[~incidence_mask] = False
+        incidence = incidence.to_sparse_coo().coalesce()
+        return incidence.indices()
+    # def overlaps1(self, other: atomspack1):
+    #     r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
+    #     if len(self.atoms) == 0 or len(other.atoms) == 0:
+    #         return torch.empty(2,0,dtype=torch.int64)
+    #     # self_unique_atoms, self_unique_inverse = self.atoms.unique(True,True)
+    #     self_unique_atoms = self.atoms.unique()
+    #     # other_unique_atoms, other_unique_inverse = other.atoms.unique(True,True)
+    #     other_unique_atoms = other.atoms.unique()
+    #     i = 0
+    #     j = 0
+    #     incidence_unique_indices = []
+    #     while i < len(self_unique_atoms) and j < len(other_unique_atoms):
+    #         if self_unique_atoms[i] > other_unique_atoms[j]:
+    #             j += 1
+    #         elif self_unique_atoms[i] < other_unique_atoms[j]:
+    #             i += 1
+    #         else:
+    #             incidence_unique_indices.append(self_unique_atoms[i])
+    #             i += 1
+    #             j += 1
+        
+    #     # now, we iterate through the incidence indices:
+    #     incidences = []
+    #     for i in incidence_unique_indices:
+    #         self_inc = torch.argwhere(self.atoms == i).flatten()
+    #         other_inc = torch.argwhere(other.atoms == i).flatten()
+
+    #         # getting every combination
+    #         self_inc = self_inc.unsqueeze(-1).broadcast_to(self_inc.size(0),other_inc.size(0))
+    #         other_inc = other_inc.unsqueeze(0).broadcast_to(self_inc.size())
+    #         self_inc = self_inc.flatten()
+    #         other_inc = other_inc.flatten()
+    #         incidences.append(torch.stack([self_inc,other_inc]))
+    #     incidences = torch.cat(incidences,-1)
+    #     return incidences
     
     @classmethod
     def from_tensor_list(cls, ls: list[Tensor]):
@@ -194,12 +194,12 @@ class TransferData1(TransferData0):
         self.node_map_edge_index = self.node_map_edge_index.flip(0)
         return self
 
-    # def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
+    # def from_atomspacks(cls, source: atomspack1, target: atomspack1):
     @classmethod
-    def from_atomspacks(cls, source: atomspack1, target: atomspack1):
+    def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
         # computing nodes in the target domains that are intersected with.
-        overlaps = source.overlaps1(target)
-        # overlaps = source.overlaps1(target,ensure_sources_subgraphs)
+        # overlaps = source.overlaps1(target)
+        overlaps = source.overlaps1(target,ensure_sources_subgraphs)
         source_domains = source.domain_indicator[overlaps[0]]
         target_domains = target.domain_indicator[overlaps[1]]
         
