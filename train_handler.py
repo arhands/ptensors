@@ -15,7 +15,7 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
     callbacks = [
         ModelCheckpoint(root_dir + '/checkpoints/',monitor='val_score',mode=mode,save_top_k=1),
         ModelSummary(4),
-        TQDMProgressBar(0,pos),
+        TQDMProgressBar(10,pos),
     ]
     if min_lr is not None:
         callbacks.append(EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr))
@@ -29,7 +29,6 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
     version = csv_logger.version
     tb_logger = TensorBoardLogger(root_dir,version=version)
     trainer = Trainer(
-        log_every_n_steps=100,
         default_root_dir=root_dir,
         enable_checkpointing=True,
         callbacks= callbacks,
