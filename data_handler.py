@@ -69,7 +69,7 @@ class DataHandler(pl.LightningDataModule):
         else:
             self.init_split_idx = idx
     def _get_dataloader(self, split: Literal['train','val','test'],shuffle: bool=False):
-        return DataLoader(self.splits[split],self.batch_size[split],shuffle) #type: ignore
+        return DataLoader(dataset=self.splits[split],batch_size=self.batch_size[split],shuffle=shuffle) #type: ignore
         # return DataLoader(self.splits[split],self.batch_size[split],shuffle,num_workers=4,pin_memory=True,pin_memory_device=self.device,prefetch_factor=3) #type: ignore
     def setup(self, stage: Literal['fit','test','predict']):
         if self.ds_name == 'ZINC':
