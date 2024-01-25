@@ -149,7 +149,7 @@ def transfer1_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
 #     return y
 
 # def transfer2_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[str]] = 'sum', large_ptensors: bool = False):
-def transfer2_2_minimal_large_ptensors(x: Tensor, data: TransferData2, reduce: Union[str,list[str]] = 'sum'):
+def transfer2_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[str]] = 'sum'):
     r"""
     Performs the minimum number of reductions such that the full space of linear maps 
     is covered if a linmaps operation is performed before and after calling this.
@@ -198,7 +198,7 @@ def transfer2_2_minimal_large_ptensors(x: Tensor, data: TransferData2, reduce: U
     y_10 = scatter(msg_i_j_ii_inv,data.node_map_edge_index[1],0,reduce=reduce[1])
     
     # We now raise y_10 to second order, avoiding duplication of the invariant parts.
-    diag = torch.zeros(len(y_2),y_10.size(1),device=x.device)
+    diag = torch.zeros(len(y_2),y_10.size(1),dtype=x.dtype,device=x.device)
     diag[data.target.diag_idx] = y_10
     return torch.cat([
         y_2,

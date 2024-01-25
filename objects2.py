@@ -177,22 +177,22 @@ class TransferData2(TransferData1):
         self.node_pair_map = node_pair_map
         self.ij_indicator = ij_indicator
 
-    # def from_atomspacks(cls, source: atomspack2, target: atomspack2, ensure_sources_subgraphs: bool):
+    # def from_atomspacks(cls, source: atomspack2, target: atomspack2):
     @classmethod
-    def from_atomspacks(cls, source: atomspack2, target: atomspack2):
-        sub = TransferData1.from_atomspacks(source,target)
-        # sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
-        sub = TransferData1.from_atomspacks(source,target)
-        # sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
+    def from_atomspacks(cls, source: atomspack2, target: atomspack2, ensure_sources_subgraphs: bool):
+        # sub = TransferData1.from_atomspacks(source,target)
+        sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
+        # sub = TransferData1.from_atomspacks(source,target)
+        sub = TransferData1.from_atomspacks(source,target,ensure_sources_subgraphs)
         
         source_reduction = atomspack1(source.get_atoms2(sub.num_nodes),source.get_domains_indicator2(),source.num_domains)
         target_reduction = atomspack1(target.get_atoms2(sub.num_nodes),target.get_domains_indicator2(),target.num_domains)
-        print(source.col_indicator.size())
-        print(source.get_atoms2().size())
-        transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction)
-        print(transfer_data1_reduction.node_map_edge_index.size())
-        print(transfer_data1_reduction.intersect_indicator.size())
-        # transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction,ensure_sources_subgraphs)
+        # print(source.col_indicator.size())
+        # print(source.get_atoms2().size())
+        # transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction)
+        # print(transfer_data1_reduction.node_map_edge_index.size())
+        # print(transfer_data1_reduction.intersect_indicator.size())
+        transfer_data1_reduction = TransferData1.from_atomspacks(source_reduction,target_reduction,ensure_sources_subgraphs)
         
         # TODO: make sure transpose_indicator is consistent with this mapping.
         # I wrote it to be, it'd just be nice to sanity check it. :)

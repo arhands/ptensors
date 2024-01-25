@@ -13,9 +13,11 @@ class atomspack1:
     def to(self,device):
         self.atoms = self.atoms.to(device)
         self.domain_indicator = self.domain_indicator.to(device)
-    def __init__(self,atoms,domain_indicator,num_domains) -> None:
+    def __init__(self,atoms,domain_indicator,num_domains:Tensor|int) -> None:
         self.atoms = atoms
         self.domain_indicator = domain_indicator
+        if isinstance(num_domains,Tensor):
+            num_domains = int(num_domains.sum().item())
         self.num_domains = num_domains
     def overlaps1(self, other: atomspack1, ensure_source_subgraphs: bool):
         r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
@@ -167,6 +169,21 @@ class TransferData0:
         self.domain_map_edge_index = self.domain_map_edge_index.flip(0)
         
         return self
+    @classmethod
+    def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
+        # computing nodes in the target domains that are intersected with.
+        # overlaps = source.overlaps1(target)
+        overlaps = source.overlaps1(target,ensure_sources_subgraphs)
+        source_domains = source.domain_indicator[overlaps[0]]
+        target_domains = target.domain_indicator[overlaps[1]]
+        
+        # 'intersect_indicator' represents the map from the source/target tensors to the intersections.
+        domain_overlaps_edge_index = torch.stack([source_domains,target_domains]).unique(dim=1)
+        
+        return cls(
+            source,
+            target,
+            domain_overlaps_edge_index)
 
 class TransferData1(TransferData0):
     node_map_edge_index: Tensor
