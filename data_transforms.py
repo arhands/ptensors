@@ -6,97 +6,9 @@ from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_networkx
 from torch import Tensor
 import networkx as nx
-from data import FancyDataObject, supported_types
+from data import FancyDataObject, supported_types, PtensObjects
 from objects import atomspack1, TransferData0, TransferData1
 from objects2 import atomspack2, TransferData2
-
-class PtensObjects:
-  ap1: dict[str,atomspack1]
-  ap2: dict[str,atomspack2]
-  tf0: dict[tuple[str,str],TransferData0]
-  tf1: dict[tuple[str,str],TransferData1]
-  tf2: dict[tuple[str,str],TransferData2]
-  def __init__(self,ap1,ap2,tf0,tf1,tf2) -> None:
-    self.ap1 = ap1
-    self.ap2 = ap2
-    self.tf0 = tf0
-    self.tf1 = tf1
-    self.tf2 = tf2
-  @overload
-  def get_atomspack(self, key: str, min_order: Literal[0,1]) -> atomspack1:...
-  @overload
-  def get_atomspack(self, key: str, min_order: Literal[2]) -> atomspack2:...
-  def get_atomspack(self, key: str, min_order: Literal[0,1,2]) -> atomspack1|atomspack2:
-    if min_order <= 1 and key in self.ap1:
-        return self.ap1[key]
-    else:
-      return self.ap2[key]
-
-  @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[0]) -> TransferData0:...
-  @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[1]) -> TransferData1:...
-  @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[2]) -> TransferData2:...
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[0,1,2]) -> TransferData0|TransferData1|TransferData2:
-    if min_order == 0 and key in self.tf0:
-      return self.tf0[key]
-    elif min_order <= 1 and key in self.tf1:
-      return self.tf1[key]
-    else:
-      return self.tf2[key]
-  
-  # def export_to_data(self, data: FancyDataObject) -> FancyDataObject:
-  def export_to_data(self, data: FancyDataObject) -> None:
-    ap: dict[str,atomspack1]|dict[str,atomspack2]
-    for ap in [self.ap1,self.ap2]:
-      key:str
-      for key in ap:
-        data.set_atomspack(ap[key],key)
-    tf: dict[tuple[str,str],TransferData0]|dict[tuple[str,str],TransferData1]|dict[tuple[str,str],TransferData2]
-    for tf in [self.tf0,self.tf1,self.tf2]:
-      key2:tuple[str,str]
-      for key2 in tf:
-        data.set_transfer_maps(*key2,tf[key2])#type: ignore
-    # return data
-  @classmethod
-  def from_fancy_data(cls, data: FancyDataObject) -> PtensObjects:
-    return cls(*data.get_ptens_params())
-
-  @overload
-  def __getitem__(self, keyOrd: tuple[str,Literal[0,1]]) -> atomspack1:...
-  @overload
-  def __getitem__(self, keyOrd: tuple[str,Literal[2]]) -> atomspack2:...
-  @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[0]]) -> TransferData0:...
-  @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[1]]) -> TransferData1:...
-  @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[2]]) -> TransferData2:...
-  def __getitem__(self, keyOrd: tuple[str|tuple[str,str],Literal[0,1,2]]) -> supported_types:
-    key, min_order = keyOrd
-    # note: this assumes the item exists and has a compatible order
-    if isinstance(key,str):
-      return self.get_atomspack(key,min_order)
-    else:
-      return self.get_transferData(key,min_order)
-
-  @overload
-  def __setitem__(self, key: str, value: atomspack1|atomspack2):...
-  @overload
-  def __setitem__(self, key: tuple[str,str], value: TransferData0|TransferData1|TransferData2):...
-  def __setitem__(self, key: str|tuple[str,str], value: supported_types):
-    if isinstance(key,str):
-      if isinstance(value,atomspack2):
-        self.ap2[key] = value
-      else:
-        self.ap1[key] = value#type: ignore
-    elif isinstance(value,TransferData2):
-      self.tf2[key] = value
-    elif isinstance(value,TransferData1):
-      self.tf1[key] = value
-    else:
-      self.tf0[key] = value#type: ignore
 
 class InitPtensData(BaseTransform):
   def __call__(self, data: Data) -> tuple[FancyDataObject,PtensObjects]:
@@ -157,14 +69,25 @@ class FinalizePtensData(BaseTransform):
 #################################################################################################################################
 
 class AddEdges(AddAtomspack):
+  graph_is_undirected: bool
+  def __init__(self, order: Literal[1, 2], graph_is_undirected : bool = True, name: str = 'edges') -> None:
+    super().__init__(order, name)
+    self.graph_is_undirected = graph_is_undirected
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
-    return list(data.edge_index.transpose(1,0))
+    edge_index: Tensor = data.edge_index
+    if self.graph_is_undirected:
+      edge_index = edge_index[:,edge_index[1]>=edge_index[0]]
+    return list(edge_index.transpose(1,0))
+
 class AddNodes(AddAtomspack):
+  def __init__(self, order: Literal[1, 2], name: str = 'nodes') -> None:
+    super().__init__(order, name)
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
     return list(torch.arange(data.num_nodes))#type: ignore
+
 class AddChordlessCycles(AddAtomspack):
   max_size: Optional[int]
-  def __init__(self, order: Literal[1, 2], name: str, max_size: Optional[int] = None) -> None:
+  def __init__(self, order: Literal[1, 2], max_size: Optional[int] = None, name: str = 'cycles') -> None:
     super().__init__(order, name)
     self.max_size = max_size
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
