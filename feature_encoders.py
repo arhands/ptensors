@@ -1,11 +1,13 @@
 from __future__ import annotations
 import torch
-from torch.nn import Module, Parameter, Embedding, EmbeddingBag, Linear
+from torch.nn import Module, Parameter, Embedding, EmbeddingBag, Linear, Sequential
 from torch import Tensor
 from typing import Literal, Union, overload
 from torch_scatter import scatter_sum
 from ogb.graphproppred.mol_encoder import BondEncoder, AtomEncoder
 from data_handler import dataset_type
+from objects import TransferData1
+from ptensors1 import transfer0_1
 
 class DummyEdgeEncoder(Module):
     r"""
@@ -32,7 +34,12 @@ class DummyNodeEncoder(Module):
         # return self.weight.broadcast_to(x.size(0),-1)
         return self.weight(torch.zeros_like(x,dtype=torch.int32))
 
-
+class Flatten(Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+    def forward(self, x: Tensor) -> Tensor:
+        x = x.flatten()
+        return x
 def get_tu_node_encoder(deg_count: int, hidden_dim: int):
     return Embedding(deg_count,hidden_dim)
 def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
@@ -40,7 +47,7 @@ def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
 
 def get_edge_encoder(hidden_dim: int,ds: dataset_type) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
     return {
-        'ZINC'              : Embedding(4,hidden_dim)       ,
+        'ZINC'              : Sequential(Flatten(),Embedding(4,hidden_dim))       ,
         'ZINC-Full'         : Embedding(4,hidden_dim)       ,
         
         # OGB/molecular
@@ -76,7 +83,7 @@ class GraphPropertyNodeEncoder(Module):
         ],-1)
 def get_node_encoder(hidden_dim: int,ds: dataset_type) -> Union[AtomEncoder,Embedding,GraphPropertyNodeEncoder]:
     return {
-        'ZINC'              : Embedding(28,hidden_dim)              ,
+        'ZINC'              : Sequential(Flatten(),Embedding(28,hidden_dim))              ,
         'ZINC-Full'         : Embedding(28,hidden_dim)              ,
 
         # OGB/Molecular
@@ -122,6 +129,9 @@ class CycleEmbedding1(Module):
         super().__init__()
         self.emb = get_node_encoder(hidden_dim,ds)
         self.epsilon = Parameter(torch.tensor(0.,requires_grad=True))
-    def forward(self, x: Tensor, atom_to_cycle: Tensor):
-        x = self.emb(x)[atom_to_cycle[0]]
-        return (1 + self.epsilon) * x + scatter_sum(x,atom_to_cycle[1],0)[atom_to_cycle[1]]
+    def forward(self, x: Tensor, node2cycle: TransferData1) -> Tensor:
+        x = self.emb(x)
+        c = x.size(-1)
+        x = transfer0_1(x,node2cycle)
+        x = (1 + self.epsilon) * x[:,:c] + x[:,c:]
+        return x

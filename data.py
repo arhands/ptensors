@@ -126,7 +126,7 @@ class PtensObjects:
 def _atomspack1_inc(data: Data, prop_name: str, value: Tensor|int) -> int|None:
   return {
     "atoms" : lambda: data.num_nodes,
-    "domain_indicator" : lambda: value.max().item() + 1,#type: ignore
+    "domain_indicator" : lambda: value.max().item() + 1 if len(value) > 0 else 0,#type: ignore
     # "domain_indicator" : lambda: getattr(data,f"{prefix}__num_domains__{key}"),
     "num_domains" : lambda: 0,
   }[prop_name]()
@@ -271,7 +271,7 @@ class FancyDataObject(Data):
     tf2: dict[tuple[str,str],TransferData2] = {(source,dest): TransferData2(*tf_to_ap2(source,dest),num_nodes=self.num_nodes,**args[key]) for source,dest,key in transfer_objects[2]}
     return ap1, ap2, tf0, tf1, tf2
   def set_atomspack(self, ap1: atomspack1|atomspack2, key: str) -> None:
-    self._set_ptens_param(key,ap1,['_atoms2','_domains_indicator2'])
+    self._set_ptens_param(key,ap1,['_atoms2','_domains_indicator2','raw_num_domains'])
   def set_transfer_maps(self, source_key: str, target_key: str, value: TransferData0|TransferData1|TransferData2) -> None:
     """NOTE: you are expected to separately set the source and target atomspacks."""
     # assert "_and_" not in source_key

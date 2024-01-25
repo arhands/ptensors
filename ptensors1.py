@@ -8,8 +8,9 @@ from typing import Callable, Optional, Union
 import torch
 from torch import Tensor
 from torch_scatter import scatter, scatter_sum
-from torch_geometric.data import Data
-from objects import TransferData1, atomspack1, atomspack2
+# from torch_geometric.data import Data
+from objects import TransferData1, atomspack1
+from objects2 import atomspack2
 
 def linmaps0_1(x: Tensor, domains:  atomspack1):
     return x[domains.domain_indicator]
@@ -31,7 +32,6 @@ def transfer0_1(x: Tensor, data: TransferData1, reduce: Union[list[str],str]='su
     """
     if isinstance(reduce,str):
         reduce = [reduce]*2
-    # node_reduced = scatter(x[data.source.domain_indicator],data.source.atoms,0,dim_size=data.num_nodes,reduce=reduce[0])
     to_target = x[data.domain_map_edge_index[0]]
     intersection_broadcasted = scatter(to_target[data.intersect_indicator],data.node_map_edge_index[1],0,dim_size=len(data.target.atoms),reduce=reduce[0])
     target_broadcasted = scatter(to_target,data.domain_map_edge_index[1],0,dim_size=data.target.num_domains,reduce=reduce[1])[data.target.domain_indicator]
