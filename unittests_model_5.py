@@ -3,7 +3,7 @@ from unittest import TestCase
 
 import torch
 from torch import Tensor
-from objects import TransferData1, atomspack1, MultiScaleData_2
+from objects1 import TransferData1, atomspack1, MultiScaleData_2
 from ptensors1 import linmaps1_1, transfer0_1, transfer1_0, transfer0_1_bi_msg
 from transforms import get_pre_transform, get_transform
 from model import Net, ModelLayer, get_node_encoder, get_edge_encoder

@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from torch_geometric.data import Data
 from torch_scatter import scatter_add
-from objects import TransferData1, atomspack1
+from objects1 import TransferData1, atomspack1
 # def _get_row_col_indicator(domain_indicator: Tensor) -> tuple[Tensor,Tensor]:
 #     rows = []
 #     cols = []

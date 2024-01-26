@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import torch
-from objects import TransferData1, atomspack1
+from objects1 import TransferData1, atomspack1
 from ptensors1 import transfer0_1, transfer1_0, transfer1_1, linmaps0_1, linmaps1_0, linmaps1_1
 
 class transfer0_1_test(TestCase):

@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 from torch_scatter import scatter, scatter_sum
 # from torch_geometric.data import Data
-from objects import TransferData1, atomspack1
+from objects1 import TransferData1, atomspack1
 from objects2 import atomspack2
 
 def linmaps0_1(x: Tensor, domains:  atomspack1):
