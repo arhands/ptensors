@@ -14,3 +14,5 @@ data_c2c
 graphproperty/processed
 graphproperty/raw
 *.pt
+*.log
+.vscode*

@@ -1,1 +1,0 @@
-This file was originally taken from https://github.com/beabevi/SUN/tree/master/graphproperty.
