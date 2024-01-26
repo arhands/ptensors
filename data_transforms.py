@@ -1,14 +1,16 @@
 from __future__ import annotations
+from math import inf
 from typing import Any, Literal, NamedTuple, Optional, overload
 import torch
 from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_networkx
 from torch import Tensor
-import networkx as nx
+# import networkx as nx
 from data import FancyDataObject, supported_types, PtensObjects
-from objects import atomspack1, TransferData0, TransferData1
+from objects1 import atomspack1, TransferData0, TransferData1
 from objects2 import atomspack2, TransferData2
+from induced_cycle_finder import get_induced_cycles, from_edge_index
 
 class GeneratePtensObject(BaseTransform):
   def __init__(self, atomspacks: list[AddAtomspack], transfers: list[AddTransferMap]) -> None:
@@ -100,6 +102,7 @@ class AddChordlessCycles(AddAtomspack):
     self.max_size = max_size
     self.undirected = undirected
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
-    G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
-    cycles: list[list[int]] = nx.chordless_cycles(G,self.max_size)#type: ignore
-    return [torch.tensor(c) for c in cycles]
+    # G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
+    # cycles: list[list[int]] = nx.chordless_cycles(G,self.max_size)#type: ignore
+    cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)
+    return [torch.tensor(c.to_list()) for c in cycles]
