@@ -6,7 +6,7 @@ from typing import Literal, Union, overload
 from torch_scatter import scatter_sum
 from ogb.graphproppred.mol_encoder import BondEncoder, AtomEncoder
 from data_handler import dataset_type
-from objects import TransferData1
+from objects1 import TransferData1
 from ptensors1 import transfer0_1
 
 class DummyEdgeEncoder(Module):
@@ -133,5 +133,6 @@ class CycleEmbedding1(Module):
         x = self.emb(x)
         c = x.size(-1)
         x = transfer0_1(x,node2cycle)
+        # x = (1 + self.epsilon) * x[:,c:] + x[:,:c]
         x = (1 + self.epsilon) * x[:,:c] + x[:,c:]
         return x

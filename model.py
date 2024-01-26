@@ -9,14 +9,14 @@ from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Parameter, M
 # from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, EmbeddingBag, ModuleList
 from torch import Tensor
 # from torch_scatter import scatter_sum
-from objects import TransferData1, atomspack1
-from ptensors1 import linmaps1_1, transfer0_1, transfer1_0
+from objects1 import TransferData1, atomspack1
+from ptensors1 import linmaps1_0, linmaps1_1, transfer0_1, transfer1_0
 from ptensors0 import transfer0_0
 from torch.nn import functional as F
 from data_handler import dataset_type
 
 from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding1
-from objects import TransferData0, TransferData1
+from objects1 import TransferData0, TransferData1
 # from objects2 import TransferData2
 
 _inner_mlp_mult = 2
@@ -190,8 +190,10 @@ class Net(Module):
         reps: list[Tensor] = []
         rep: Tensor
         name: str
-        for rep, name in [(node_rep,'nodes'),(edge_rep,'edges'),(cycle_rep,'cycles')]:
+        for rep, name, order in [(node_rep,'nodes',0),(edge_rep,'edges',0),(cycle_rep,'cycles',1)]:
             ap: atomspack1 = data[(name,0)]
+            if order == 1:
+                rep = linmaps1_0(rep,ap,self.readout)
             if isinstance(ap.raw_num_domains,int):
                 reps.append(segment(rep,torch.tensor([len(rep)],dtype=torch.int32,device=rep.device),self.readout))
             else:
