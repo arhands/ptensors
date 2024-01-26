@@ -1,4 +1,0 @@
-python3 main_ogb_molhiv.py --num_epochs=200 --train_batch_size=128 --lr=0.0001 --optimizer="asam" --dropout=0.5 --ptensor_reduction="mean" --run_path="runs/ogbg_molhiv" --bn_momentum=0.05;
-python3 main_ogb_molhiv.py --num_epochs=200 --train_batch_size=128 --lr=0.0001 --optimizer="asam" --dropout=0.5 --ptensor_reduction="mean" --run_path="runs/ogbg_molhiv" --bn_momentum=0.05;
-python3 main_ogb_molhiv.py --num_epochs=200 --train_batch_size=128 --lr=0.0001 --optimizer="asam" --dropout=0.5 --ptensor_reduction="mean" --run_path="runs/ogbg_molhiv"; 
-python3 main_ogb_molhiv.py --num_epochs=200 --train_batch_size=128 --lr=0.0001 --optimizer="asam" --dropout=0.5 --ptensor_reduction="mean" --run_path="runs/ogbg_molhiv";
