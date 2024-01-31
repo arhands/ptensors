@@ -47,9 +47,9 @@ def get_score_fn(ds: dataset_type):
         raise NotImplementedError(f'Not implemented for dataset \"{ds}\".')
 
 def get_lr_scheduler(ds: dataset_type, optimizer: Optimizer, **args):
-    if ds in ['ZINC','peptides-struct']:
+    if ds in ['ZINC','ZINC-Full','peptides-struct']:
         return {
-            "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],0.5,args['lr_patience'],cooldown=args['cooldown'],verbose=True),
+            "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],args['lr_decay'],args['lr_patience'],cooldown=args['cooldown'],verbose=True),
             "monitor" : "val_score_multi"
         }
     elif ds in _tu_datasets:

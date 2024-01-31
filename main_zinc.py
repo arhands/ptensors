@@ -28,7 +28,8 @@ parser.add_argument('--force_use_cpu',action='store_true')
 parser.add_argument('--use_old_model',action='store_true')
 parser.add_argument('--bn_eps',type=float,default=0.00001)
 parser.add_argument('--bn_momentum',type=float,default=0.05)
-parser.add_argument('--ptensor_reduction',type=str,default='sum')
+parser.add_argument('--lr_decay',type=float,default=0.5)
+parser.add_argument('--ptensor_reduction',type=str,default='mean')
 parser.add_argument('--valid_score_sample_size',type=int,default=1)
 
 args = parser.parse_args()
@@ -88,7 +89,7 @@ with open(overview_log_path,'w') as file:
     ]
     file.writelines(lines)
 
-model = ModelHandler(model,args.lr,dataset,'adam',args.valid_score_sample_size,lr_patience = args.patience, mode='min', cooldown=args.cooldown)
+model = ModelHandler(model,args.lr,dataset,'adam',args.valid_score_sample_size,lr_patience = args.patience, mode='min', cooldown=args.cooldown,lr_decay=args.lr_decay)
 
 data_handler = ZINCDatasetHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,pre_transform,None,args.subset)
 
