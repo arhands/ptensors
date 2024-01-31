@@ -1,15 +1,6 @@
-# from model_gine_2 import Net
-from torch.cuda import is_available
 from argparse import ArgumentParser
-from datetime import datetime
-from utils import get_run_path
-from model_handler import ModelHandler
-from data_handler import ZINCDatasetHandler
-from train_handler import get_trainer
-from model import Net
-import os
-
 parser = ArgumentParser()
+parser.add_argument('--dataset',type=str,required=True)
 parser.add_argument('--hidden_channels',type=int,default=128)
 parser.add_argument('--num_layers',type=int,default=4)
 parser.add_argument('--dropout',type=float,default=0.)
@@ -19,47 +10,58 @@ parser.add_argument('--num_epochs',type=int,default=1000)
 parser.add_argument('--lr',type=float,default=0.001)
 parser.add_argument('--min_lr',type=float,default=1E-5)
 parser.add_argument('--train_batch_size',type=int,default=128)
-parser.add_argument('--cooldown',type=int,default=0)
-parser.add_argument('--subset',action='store_false')
 
 parser.add_argument('--eval_batch_size',type=int,default=512)
 parser.add_argument('--run_path',type=str,default=None)
 parser.add_argument('--force_use_cpu',action='store_true')
-parser.add_argument('--use_old_model',action='store_true')
 parser.add_argument('--bn_eps',type=float,default=0.00001)
-parser.add_argument('--bn_momentum',type=float,default=0.05)
+parser.add_argument('--bn_momentum',type=float,default=0.1)
 parser.add_argument('--lr_decay',type=float,default=0.5)
 parser.add_argument('--ptensor_reduction',type=str,default='mean')
-parser.add_argument('--valid_score_sample_size',type=int,default=1)
+parser.add_argument('--readout',type=str,default='sum')
+parser.add_argument('--device',type=str,default=None)
+parser.add_argument('--include_cycle2cycle',action='store_true')
 
 args = parser.parse_args()
 
-dataset = 'ZINC'
-
-def get_ds_path(old_model: bool, subset: bool):
-    if old_model:
-        return 'data'
-    else:
-        assert subset
-        return 'data'
-
-device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
-
+from torch.cuda import is_available
+from datetime import datetime
+from utils import get_run_path
+from model_handler import ModelHandler
+from data_handler import dataset_type, _tu_datasets, ZINCDatasetHandler, DataHandler, OGBGDatasetHandler, TUDatasetHandler
+from train_handler import get_trainer
+from model import Net
+import os
 from data_transforms import AddNodes, AddEdges, AddChordlessCycles, AddTransferMap, GeneratePtensObject
+
+
+
+
+dataset: dataset_type = args.dataset
+
+device: str
+if args.device is None:
+    device = 'cpu' if args.force_use_cpu or not is_available() else 'cuda'
+else:
+    device = args.device
+
+transfer_maps: list[AddTransferMap] = [
+        AddTransferMap('nodes','edges',0,False),
+        AddTransferMap('nodes','cycles',1,False),
+        AddTransferMap('edges','cycles',1,True),
+    ]
+if args.include_cycle2cycle:
+    transfer_maps.append(AddTransferMap('cycles','cycles',1,False))
 pre_transform = GeneratePtensObject(
     [
         AddNodes(1),
         AddEdges(1),
         AddChordlessCycles(1),
     ],
-    [
-        AddTransferMap('nodes','edges',0,False),
-        AddTransferMap('nodes','cycles',1,False),
-        AddTransferMap('edges','cycles',1,True),
-    ]
+    transfer_maps
 )
 
-model = Net(args.hidden_channels,args.num_layers,args.dropout,'ZINC','sum',args.bn_eps,args.bn_momentum,args.ptensor_reduction).to(device)
+model = Net(args.hidden_channels,args.num_layers,args.dropout,dataset,args.readout,0.00001,args.bn_momentum,args.ptensor_reduction,args.include_cycle2cycle).to(device)
 def ensure_exists(path: str):
     base = ''
     for segment in path.split('/'):
@@ -67,7 +69,7 @@ def ensure_exists(path: str):
         if not os.path.exists(base):
             os.mkdir(base)
 
-ds_path = get_ds_path(args.use_old_model,args.subset)
+ds_path = './data/'
 if args.run_path is None:
     run_path = get_run_path('runs')
 else:
@@ -89,23 +91,18 @@ with open(overview_log_path,'w') as file:
     ]
     file.writelines(lines)
 
-model = ModelHandler(model,args.lr,dataset,'adam',args.valid_score_sample_size,lr_patience = args.patience, mode='min', cooldown=args.cooldown,lr_decay=args.lr_decay)
+model = ModelHandler(model,args.lr,dataset,'adam',1,lr_patience = args.patience, mode='min', cooldown=0,lr_decay=args.lr_decay)
 
-data_handler = ZINCDatasetHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,pre_transform,None,args.subset)
-
-with open(overview_log_path,'a') as file:
-    file.writelines([
-        'Model Summary',
-        str(model)
-    ])
-
+data_handler : DataHandler
+if dataset in ['ZINC','ZINC-Full']:
+    data_handler = ZINCDatasetHandler(ds_path,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,pre_transform,None,dataset != 'ZINC-Full')
+elif dataset in ['ogbg-molhiv','ogbg-moltox21']:
+    data_handler = OGBGDatasetHandler(ds_path,dataset,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,pre_transform,None)#type: ignore
+elif dataset in _tu_datasets:
+    data_handler = TUDatasetHandler(ds_path,dataset,device,args.train_batch_size,args.eval_batch_size,args.eval_batch_size,pre_transform,None)#type: ignore
+else:
+    raise NotImplementedError(dataset)
 
 trainer.fit(model,datamodule=data_handler)
 
 test_result = trainer.test(model,ckpt_path='best',datamodule=data_handler)
-
-with open(overview_log_path,'a') as file:
-    file.writelines([
-        'test result',
-        str(test_result)
-    ])
