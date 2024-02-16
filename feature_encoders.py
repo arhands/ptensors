@@ -35,16 +35,18 @@ class DummyNodeEncoder(Module):
         return self.weight(torch.zeros_like(x,dtype=torch.int32))
 
 class Flatten(Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
     def forward(self, x: Tensor) -> Tensor:
+        assert x.size(-1) == 1, x.size()
         x = x.flatten()
         return x
+class ToInt(Module):
+    def forward(self, x: Tensor) -> Tensor:
+        return x.int()
 def get_tu_node_encoder(deg_count: int, hidden_dim: int):
     return Embedding(deg_count,hidden_dim)
 def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
     return EmbeddingBag(deg_count,hidden_dim)
-
+# TODO: move type-casting to preprocessing
 def get_edge_encoder(hidden_dim: int,ds: dataset_type) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
     return {
         'ZINC'              : Sequential(Flatten(),Embedding(4,hidden_dim))       ,
@@ -95,7 +97,7 @@ def get_node_encoder(hidden_dim: int,ds: dataset_type) -> Union[AtomEncoder,Embe
         'graphproperty'     : GraphPropertyNodeEncoder(hidden_dim)  ,
 
         # TUDatasets
-        'MUTAG'             : Embedding( 7,hidden_dim)              ,
+        'MUTAG'             : Embedding( 7,hidden_dim),
         'ENZYMES'           : Embedding( 3,hidden_dim)              ,
         'PROTEINS'          : Embedding( 3,hidden_dim)              ,
         # 'COLLAB'            : get_tu_node_encoder(hidden_dim)          ,

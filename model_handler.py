@@ -18,6 +18,12 @@ class Log10MSE(MeanSquaredError):
     def compute(self) -> Tensor:
         return super().compute().log10()
 
+def get_mode(ds: dataset_type) -> Literal['min','max']:
+    if ds in ['ZINC','ZINC-Full','peptides-struct']:
+        return 'min'
+    else:
+        return 'max'
+
 def get_loss_fn(ds: dataset_type):
     if ds in ['ZINC','peptides-struct']:
         return L1Loss()
@@ -85,7 +91,7 @@ class ModelHandler(pl.LightningModule):
         self.train_score_fn = get_score_fn(ds)
         self.valid_score_fn = get_score_fn(ds)
         self.test_score_fn = get_score_fn(ds)
-        self.running_mean_score_fn = RunningMean(running_mean_window_size)
+        # self.running_mean_score_fn = RunningMean(running_mean_window_size)
         self.lr = lr
 
         self.lr_scheduler_args = lr_schedular_args
@@ -97,7 +103,7 @@ class ModelHandler(pl.LightningModule):
 
     def forward(self, x: Tensor, edge_attr: Tensor, data: PtensObjects) -> Tensor:
         # TODO: remove flatten :(
-        return self.model(x,edge_attr,data).flatten()
+        return self.model(x,edge_attr,data)
     
     def training_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):
         x: Tensor
@@ -140,11 +146,11 @@ class ModelHandler(pl.LightningModule):
         self.test_score_fn(self(x,edge_attr,data),y)
     def on_validation_epoch_end(self) -> None:
         self.log('lr-Adam',self.optimizers(False).param_groups[0]['lr'])
-        valid_score = self.valid_score_fn.compute()
-        self.valid_score_fn.reset()
-        self.log('val_score',valid_score,on_epoch=True,prog_bar=True)
-        self.running_mean_score_fn.update(valid_score)
-        self.log('val_score_multi',self.running_mean_score_fn.compute(),on_epoch=True)
+        # valid_score = self.valid_score_fn.compute()
+        # self.valid_score_fn.reset()
+        self.log('val_score',self.valid_score_fn,on_epoch=True,prog_bar=True)
+        # self.running_mean_score_fn.update(valid_score)
+        # self.log('val_score_multi',self.running_mean_score_fn.compute(),on_epoch=True)
     def on_test_epoch_end(self) -> None:
         self.log('test_score',self.test_score_fn,on_epoch=True)
 

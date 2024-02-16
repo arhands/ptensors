@@ -4,7 +4,7 @@ from typing import Any, Literal, NamedTuple, Optional, overload
 import torch
 from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
-from torch_geometric.utils import to_networkx
+from torch_geometric.utils import to_networkx, degree
 from torch import Tensor
 # import networkx as nx
 from data import FancyDataObject, supported_types, PtensObjects
@@ -104,5 +104,50 @@ class AddChordlessCycles(AddAtomspack):
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
     # G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
     # cycles: list[list[int]] = nx.chordless_cycles(G,self.max_size)#type: ignore
-    cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)
+    cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)#type: ignore
     return [torch.tensor(c.to_list()) for c in cycles]
+
+#################################################################################################################################
+# dataset specific transforms
+#################################################################################################################################
+class TUPreprocessingBase(BaseTransform):
+  def __init__(self, ds: str) -> None:
+    super().__init__()
+    self.is_multilabel = ds in ['COLLAB','IMDB-MULTI','ENZYMES']
+    self.ignore_degree = ds == 'REDDIT_BINARY'
+  @overload
+  def __call__(self, data: FancyDataObject) -> FancyDataObject:...
+  @overload
+  def __call__(self, data: Data) -> Data:...
+  def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
+    if data.x is not None:
+        data.x = data.x.argmax(1)#type: ignore
+    else:
+        # data.x = torch.empty(data.num_nodes,dtype=torch.int8) # since we only care about the size.
+        if self.ignore_degree:
+            data.x = torch.zeros(data.num_nodes,dtype=torch.int8)#type: ignore
+        else:
+            data.x = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)#type: ignore
+    if data.edge_attr is not None:
+        if data.edge_attr.ndim > 1:
+            data.edge_attr = data.edge_attr.argmax(1)#type: ignore
+    else:
+        if self.ignore_degree:
+            data.edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)#type: ignore
+        else:
+            deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+            data.edge_attr = deg[data.edge_index].transpose(1,0)#type: ignore
+        # data.edge_attr = torch.empty(data.edge_index.size(1),dtype=torch.int8) # since we only care about the size.
+    if self.is_multilabel:
+        if data.y.ndim > 1:
+            data.y = data.y.squeeze()#type: ignore
+        assert data.y.ndim == 1
+        data.y = data.y.long()#type: ignore
+    elif data.y.ndim == 1:
+        data.y = data.y.unsqueeze(-1).float()#type: ignore
+    
+    # TODO: find a better way to handle V, maybe.
+    # if data.is_directed:
+    #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
+
+    return data

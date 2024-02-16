@@ -8,6 +8,8 @@ from ogb.graphproppred import PygGraphPropPredDataset
 from torch_geometric.loader import DataLoader
 from data import FancyDataObject, PtensObjects
 from torch_geometric.data import InMemoryDataset
+from torch_geometric.transforms import BaseTransform, Compose
+from data_transforms import TUPreprocessingBase
 
 from sklearn.model_selection import StratifiedKFold
 
@@ -39,10 +41,11 @@ dataset_type = Union[
 class DataHandler(pl.LightningDataModule):
     splits: dict[Literal['train','val','test'],InMemoryDataset]
     batch_size: dict[Literal['train','val','test'],int]
+    
     def __init__(self, root: str, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform, transform) -> None:
         super().__init__()
         # self.transform = PreprocessTransform()
-        self.pre_transform = pre_transform
+        self.pre_transform_param = pre_transform
         self.transform = transform
         self.root = root
         self.device = device
@@ -55,6 +58,7 @@ class DataHandler(pl.LightningDataModule):
         # self.num_folds : int = num_folds #type: ignore
         # self.seed : int = seed #type: ignore
         # self.pre_move_to_device = pre_move_to_device
+    def get_dataset_base_pre_transform(self) -> None|BaseTransform:...
     # def prepare_data(self) -> None:
     #     if self.ds_name == 'ZINC':
     #         for split in ['train','val','test']:
@@ -134,7 +138,16 @@ class DataHandler(pl.LightningDataModule):
         #         del self.init_split_idx
         # else:
         #     raise NotImplementedError(f'Dataset setup for "{self.ds_name}" not implemented.')
-    
+    def get_pre_transform(self) -> BaseTransform | None:
+        base_pre_transform: BaseTransform | None = self.get_dataset_base_pre_transform()
+        if self.pre_transform_param is None:
+            pre_transform: BaseTransform | None = base_pre_transform
+        elif base_pre_transform is None:
+            pre_transform = self.pre_transform_param
+        else:
+            pre_transform = Compose([base_pre_transform,self.pre_transform_param])
+            # pre_transform = Compose([self.pre_transform_param,base_pre_transform])
+        return pre_transform
     def train_dataloader(self):
         return self._get_dataloader('train',True)
     def test_dataloader(self):
@@ -156,13 +169,13 @@ class ZINCDatasetHandler(DataHandler):
         self.subset = subset
     
     def prepare_data(self) -> None:
-        ZINC(self.root,self.subset,pre_transform=self.pre_transform,transform=self.transform)
+        ZINC(self.root,self.subset,pre_transform=self.get_pre_transform(),transform=self.transform)
         # for split in ['train','val','test']:
             # ZINC(self.root,self.subset,split,pre_transform=self.pre_transform,transform=self.transform)
     
     def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
         return {#type: ignore
-                split : ZINC(self.root,self.subset,split,pre_transform=self.pre_transform,transform=self.transform)
+                split : ZINC(self.root,self.subset,split,pre_transform=self.get_pre_transform(),transform=self.transform)
                 for split in ['train','val','test']
             }
 
@@ -173,10 +186,10 @@ class OGBGDatasetHandler(DataHandler):
         self.ds_name = ds_name
     
     def prepare_data(self) -> None:
-        PygGraphPropPredDataset(self.ds_name,self.root,pre_transform=self.pre_transform,transform=self.transform)
+        PygGraphPropPredDataset(self.ds_name,self.root,pre_transform=self.get_pre_transform(),transform=self.transform)
     
     def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
-        ds = PygGraphPropPredDataset(self.ds_name,self.root,pre_transform=self.pre_transform,transform=self.transform)
+        ds = PygGraphPropPredDataset(self.ds_name,self.root,pre_transform=self.get_pre_transform(),transform=self.transform)
         splits: dict[Literal['train','val','test'], InMemoryDataset]
         if self.ds_name == 'ogbg-molhiv':
             split_idx = ds.get_idx_split()
@@ -203,27 +216,35 @@ class TUDatasetHandler(DataHandler):
         self.num_folds = num_folds
         self.seed = seed
         self.ds_name = ds_name
+        self.split_idx = 0
+        
+    def get_dataset_base_pre_transform(self) -> BaseTransform | None:
+        return TUPreprocessingBase(self.ds_name)
+        # if self.ds_name == 'MUTAG':
+        #     return MUTAG_PROC()
+        # else:
+        #     return None# TODO: expand out
     
     def prepare_data(self) -> None:
-        TUDataset(self.root,self.ds_name,self.transform,self.pre_transform,use_edge_attr=True,use_node_attr=True)
+        TUDataset(self.root,self.ds_name,self.transform,self.get_pre_transform(),use_edge_attr=True,use_node_attr=True)
     def set_fold_idx(self, idx: int):
         self.split_idx = idx
         self.splits = self._get_splits()
-        if hasattr(self,'split_indices'):
-            # adapted from GIN.
-            train_idx, test_idx = self.split_indices[idx]
-            # self.train_idx = train_idx
-            # self.test_idx = test_idx
-            # self.splits = {
-            #     'train' : self.ds[train_idx],
-            #     'val' : self.ds[test_idx],
-            #     'test' : self.ds[test_idx],
-            # }
-        # else:
-        self.split_idx = idx
+        # if hasattr(self,'split_indices'):
+        #     # adapted from GIN.
+        #     train_idx, test_idx = self.split_indices[idx]
+        #     # self.train_idx = train_idx
+        #     # self.test_idx = test_idx
+        #     # self.splits = {
+        #     #     'train' : self.ds[train_idx],
+        #     #     'val' : self.ds[test_idx],
+        #     #     'test' : self.ds[test_idx],
+        #     # }
+        # # else:
+        # self.split_idx = idx
     def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
         # adapted from GIN
-        ds = TUDataset(self.root,self.ds_name,self.transform,self.pre_transform,use_edge_attr=True,use_node_attr=True)
+        ds = TUDataset(self.root,self.ds_name,self.transform,self.get_pre_transform(),use_edge_attr=True,use_node_attr=True)
         skf = StratifiedKFold(self.num_folds,shuffle=True,random_state=self.seed)#type: ignore
         if not hasattr(self,'split_indices'):
             self.split_indices = list(skf.split(np.zeros(len(ds)),ds.y))
