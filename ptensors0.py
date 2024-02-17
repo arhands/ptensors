@@ -2,7 +2,7 @@ from __future__ import annotations
 from torch import Tensor
 from typing import Callable, Optional
 from torch_scatter import scatter
-from objects import TransferData0
+from objects1 import TransferData0
 
 def transfer0_0(x: Tensor, transfer_data: TransferData0, reduce: str = 'sum') -> Tensor:
     messages = x[transfer_data.domain_map_edge_index[0]]

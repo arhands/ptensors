@@ -10,7 +10,8 @@ tmp/
 sam.py
 data_c2c
 *.csv
-*.sh
 graphproperty/processed
 graphproperty/raw
 *.pt
+*.log
+.vscode*

@@ -1,12 +1,12 @@
 from __future__ import annotations
 import re
-from typing import Any, Literal, Union
+from typing import Any, Literal, Union, overload
 
 from pandas.core.indexes.base import InvalidIndexError
 from torch import Tensor
 import torch
 from torch_geometric.data import Data
-from objects import atomspack1, TransferData0, TransferData1
+from objects1 import atomspack1, TransferData0, TransferData1
 from objects2 import atomspack2, TransferData2
 supported_types = Union[atomspack1,atomspack2,TransferData0,TransferData1,TransferData2]
 _prefixes = {
@@ -35,12 +35,98 @@ def _object_to_prefix(p:supported_types) -> str:
 
 
 _key_regex: re.Pattern[str] = re.compile("^(" + "|".join(_prefixes) + ")__((_?[0-9a-zA-Z])+)__([0-9a-zA-Z_]+)$")
+class PtensObjects:
+  ap1: dict[str,atomspack1]
+  ap2: dict[str,atomspack2]
+  tf0: dict[tuple[str,str],TransferData0]
+  tf1: dict[tuple[str,str],TransferData1]
+  tf2: dict[tuple[str,str],TransferData2]
+  def __init__(self,ap1,ap2,tf0,tf1,tf2) -> None:
+    self.ap1 = ap1
+    self.ap2 = ap2
+    self.tf0 = tf0
+    self.tf1 = tf1
+    self.tf2 = tf2
+  @overload
+  def get_atomspack(self, key: str, min_order: Literal[0,1]) -> atomspack1:...
+  @overload
+  def get_atomspack(self, key: str, min_order: Literal[2]) -> atomspack2:...
+  def get_atomspack(self, key: str, min_order: Literal[0,1,2]) -> atomspack1|atomspack2:
+    if min_order <= 1 and key in self.ap1:
+        return self.ap1[key]
+    else:
+      return self.ap2[key]
 
+  @overload
+  def get_transferData(self, key: tuple[str,str], min_order: Literal[0]) -> TransferData0:...
+  @overload
+  def get_transferData(self, key: tuple[str,str], min_order: Literal[1]) -> TransferData1:...
+  @overload
+  def get_transferData(self, key: tuple[str,str], min_order: Literal[2]) -> TransferData2:...
+  def get_transferData(self, key: tuple[str,str], min_order: Literal[0,1,2]) -> TransferData0|TransferData1|TransferData2:
+    if min_order == 0 and key in self.tf0:
+      return self.tf0[key]
+    elif min_order <= 1 and key in self.tf1:
+      return self.tf1[key]
+    else:
+      return self.tf2[key]
+  
+  # def export_to_data(self, data: FancyDataObject) -> FancyDataObject:
+  def export_to_data(self, data: FancyDataObject) -> None:
+    ap: dict[str,atomspack1]|dict[str,atomspack2]
+    for ap in [self.ap1,self.ap2]:
+      key:str
+      for key in ap:
+        data.set_atomspack(ap[key],key)
+    tf: dict[tuple[str,str],TransferData0]|dict[tuple[str,str],TransferData1]|dict[tuple[str,str],TransferData2]
+    for tf in [self.tf0,self.tf1,self.tf2]:
+      key2:tuple[str,str]
+      for key2 in tf:
+        data.set_transfer_maps(*key2,tf[key2])#type: ignore
+    # return data
+  @classmethod
+  def from_fancy_data(cls, data: FancyDataObject) -> PtensObjects:
+    return cls(*data.get_ptens_params())
+
+  @overload
+  def __getitem__(self, keyOrd: tuple[str,Literal[0,1]]) -> atomspack1:...
+  @overload
+  def __getitem__(self, keyOrd: tuple[str,Literal[2]]) -> atomspack2:...
+  @overload
+  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[0]]) -> TransferData0:...
+  @overload
+  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[1]]) -> TransferData1:...
+  @overload
+  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[2]]) -> TransferData2:...
+  def __getitem__(self, keyOrd: tuple[str|tuple[str,str],Literal[0,1,2]]) -> supported_types:
+    key, min_order = keyOrd
+    # note: this assumes the item exists and has a compatible order
+    if isinstance(key,str):
+      return self.get_atomspack(key,min_order)
+    else:
+      return self.get_transferData(key,min_order)
+
+  @overload
+  def __setitem__(self, key: str, value: atomspack1|atomspack2):...
+  @overload
+  def __setitem__(self, key: tuple[str,str], value: TransferData0|TransferData1|TransferData2):...
+  def __setitem__(self, key: str|tuple[str,str], value: supported_types):
+    if isinstance(key,str):
+      if isinstance(value,atomspack2):
+        self.ap2[key] = value
+      else:
+        self.ap1[key] = value#type: ignore
+    elif isinstance(value,TransferData2):
+      self.tf2[key] = value
+    elif isinstance(value,TransferData1):
+      self.tf1[key] = value
+    else:
+      self.tf0[key] = value#type: ignore
 # def _atomspack1_inc(data: Data, prefix: str, prop_name: str, key: str, value: Union[Tensor,int]):
 def _atomspack1_inc(data: Data, prop_name: str, value: Tensor|int) -> int|None:
   return {
     "atoms" : lambda: data.num_nodes,
-    "domain_indicator" : lambda: value.max().item() + 1,#type: ignore
+    "domain_indicator" : lambda: value.max().item() + 1 if len(value) > 0 else 0,#type: ignore
     # "domain_indicator" : lambda: getattr(data,f"{prefix}__num_domains__{key}"),
     "num_domains" : lambda: 0,
   }[prop_name]()
@@ -185,7 +271,7 @@ class FancyDataObject(Data):
     tf2: dict[tuple[str,str],TransferData2] = {(source,dest): TransferData2(*tf_to_ap2(source,dest),num_nodes=self.num_nodes,**args[key]) for source,dest,key in transfer_objects[2]}
     return ap1, ap2, tf0, tf1, tf2
   def set_atomspack(self, ap1: atomspack1|atomspack2, key: str) -> None:
-    self._set_ptens_param(key,ap1,['_atoms2','_domains_indicator2'])
+    self._set_ptens_param(key,ap1,['_atoms2','_domains_indicator2','raw_num_domains'])
   def set_transfer_maps(self, source_key: str, target_key: str, value: TransferData0|TransferData1|TransferData2) -> None:
     """NOTE: you are expected to separately set the source and target atomspacks."""
     # assert "_and_" not in source_key

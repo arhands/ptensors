@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import torch
-from objects import TransferData1, atomspack1
+from objects1 import TransferData1, atomspack1
 from ptensors0 import transfer0_0
 # linmaps
 class transfer0(TestCase):
@@ -11,7 +11,7 @@ class transfer0(TestCase):
         
         a = atomspack1.from_list(a)
         b = atomspack1.from_list(b)
-        transfer_map = TransferData1.from_atomspacks(a,b)
+        transfer_map = TransferData1.from_atomspacks(a,b,False)
         
         x = torch.tensor([1]).unsqueeze(-1)
 

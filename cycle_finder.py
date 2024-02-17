@@ -1,24 +1,7 @@
 from __future__ import annotations
-from typing import Dict, Generic, List, Set, Tuple, TypeVar, Union
-import torch
+from typing import Generic, List, Set, Tuple, TypeVar, Union
 from torch import Tensor
 import numpy as np
-"""
-Zeroth order feature:
-    - vertex of degree 0
-First order feature: 
-    - vertex of degree 1
-"""
-# def generate_cycle(num_nodes: int) -> Tensor:
-#     return torch.stack([torch.range(num_nodes),torch.range(1,num_nodes+1)%num_nodes]) 
-# def join_graphs(edge_index1: Tensor, num_nodes_1: int, edge_index2: Tensor) -> Tensor:
-#     return torch.cat([edge_index1,edge_index2 + num_nodes_1],-1)
-
-# num_nodes = 6
-# assert num_nodes % 2 == 0
-# A = generate_cycle(num_nodes)
-# B = generate_cycle(num_nodes//2)
-# B = join_graphs(B,num_nodes//2,B)
 
 class Node:
     neighbors: Set[Node]
@@ -34,7 +17,7 @@ class Node:
                 for m in self.neighbors:
                     if n != m and n not in m.neighbors:
                         m.neighbors.add(n)
-        
+
         for n in self.neighbors:
             n.neighbors.remove(m)
 
@@ -47,20 +30,20 @@ class Graph:
         return self.nodes.shape[0]
     def __init__(self, nodes: np.ndarray[Node]) -> None:
         self.nodes = nodes
-    
+
     @classmethod
     def from_edge_index(cls, edge_index: Tensor, num_nodes: int) -> Graph:
         nodes = np.array([Node() for _ in range(num_nodes)],dtype=Node)
         for e in edge_index.transpose(1,0).tolist():
             nodes[e[0]].neighbors.add(e[1])
         return cls(nodes)
-    
-    
+
+
     def copy(self) -> Graph:
         return Graph([n.copy() for n in self.nodes])
-        
 
-        
+
+
 def reduce_graph_1(G : Graph) -> Graph:
     r"""
     Reduces the graph until there are no vertices of degree <= 1.
@@ -75,13 +58,13 @@ def reduce_graph_1(G : Graph) -> Graph:
             if deg <= 1:
                 if deg == 1:
                     new_list.append(next(iter((n.neighbors))))
-                
+
                 keeping_mask[idx] = False
                 n.remove(False)
-        
+
         current_list.clear()
         new_list, current_list = current_list, new_list
-    
+
     return Graph(G.nodes[keeping_mask])
 
 def reduce_graph_2(G : Graph) -> Graph:
@@ -100,7 +83,7 @@ def reduce_graph_2(G : Graph) -> Graph:
             if deg_m == 2:
                 keeping_mask[idx] = False
                 n.remove(True)
-    
+
     return Graph(G.nodes[keeping_mask])
 
 
@@ -116,7 +99,7 @@ class LinkedList(Generic[T]):
         super().__init__()
         self.last_ele = last_ele
         self.value = value
-    
+
     def to_list(self) -> List[T]:
         if self.last_ele is None:
             return [self.value]
@@ -130,14 +113,14 @@ class LinkedList(Generic[T]):
         for v in ls:
             val = cls(val,v)
         return val
-    
+
     def __getitem__(self, idx: slice) -> LinkedList[T]:
         # TODO: fix placeholder code.
         return self.from_list(self.to_list()[idx])
 
     def __contains__(self, key: T) -> bool:
         return key == self.value or self.last_ele is not None and key in self.last_ele
-    
+
     def __str__(self) -> str:
         return str(self.to_list())
 
@@ -162,4 +145,3 @@ def compute_3_regular_cell_complex_3(G: Graph) -> Set[Tuple[Node]]:
     """
     minimal_cycles = {tuple(get_smallest_enclosing_cycle(n).to_list()) for n in G.nodes}
     return minimal_cycles
-
