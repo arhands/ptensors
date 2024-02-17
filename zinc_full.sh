@@ -1,3 +1,4 @@
+# TODO: add back c2c
 python3 main.py             \
   --dataset=ZINC-Full       \
   --hidden_channels=128     \
@@ -7,7 +8,7 @@ python3 main.py             \
   --train_batch_size=128    \
   --bn_momentum=0.05        \
   --lr_decay=0.5            \
-  --ptensor_reduction=mean  \
+  --ptensor_reduction=sum   \
   --readout=sum             \
   --patience=80             \
   --show_epoch_progress_bar \

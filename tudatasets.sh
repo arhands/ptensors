@@ -7,4 +7,6 @@ python3 main.py                                                         \
   --max_cycle_size=10                                                   \
   --show_epoch_progress_bar                                             \
   --num_epochs=350                                                      \
-  --ptensor_reduction=mean
+  --patience=50                                                         \
+  --lr=[0.01,0.001]                                                     \
+  --ptensor_reduction=sum
