@@ -151,3 +151,13 @@ class TUPreprocessingBase(BaseTransform):
     #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
 
     return data
+
+class ZINCPreProcessingBase(BaseTransform):
+  @overload
+  def __call__(self, data: FancyDataObject) -> FancyDataObject:...
+  @overload
+  def __call__(self, data: Data) -> Data:...
+  def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
+    data.x = data.x.flatten()#type: ignore
+    data.y = data.y.unsqueeze(-1)#type: ignore
+    return data

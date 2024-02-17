@@ -56,7 +56,7 @@ def get_lr_scheduler(ds: dataset_type, optimizer: Optimizer, **args):
     if ds in ['ZINC','ZINC-Full','peptides-struct']:
         return {
             "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],args['lr_decay'],args['lr_patience'],cooldown=args['cooldown'],verbose=True),
-            "monitor" : "val_score_multi"
+            "monitor" : "val_score"
         }
     elif ds in _tu_datasets:
         return StepLR(optimizer,50,0.5)

@@ -9,7 +9,7 @@ from torch_geometric.loader import DataLoader
 from data import FancyDataObject, PtensObjects
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.transforms import BaseTransform, Compose
-from data_transforms import TUPreprocessingBase
+from data_transforms import TUPreprocessingBase, ZINCPreProcessingBase
 
 from sklearn.model_selection import StratifiedKFold
 
@@ -168,6 +168,9 @@ class ZINCDatasetHandler(DataHandler):
         super().__init__(root + '/ZINC', device, train_batch_size, val_batch_size, test_batch_size, pre_transform, transform)
         self.subset = subset
     
+    def get_dataset_base_pre_transform(self) -> None | BaseTransform:
+        return ZINCPreProcessingBase()
+
     def prepare_data(self) -> None:
         ZINC(self.root,self.subset,pre_transform=self.get_pre_transform(),transform=self.transform)
         # for split in ['train','val','test']:

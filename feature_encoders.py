@@ -49,7 +49,7 @@ def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
 # TODO: move type-casting to preprocessing
 def get_edge_encoder(hidden_dim: int,ds: dataset_type) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
     return {
-        'ZINC'              : Sequential(Flatten(),Embedding(4,hidden_dim))       ,
+        'ZINC'              : Embedding(4,hidden_dim)       ,
         'ZINC-Full'         : Embedding(4,hidden_dim)       ,
         
         # OGB/molecular
@@ -85,7 +85,7 @@ class GraphPropertyNodeEncoder(Module):
         ],-1)
 def get_node_encoder(hidden_dim: int,ds: dataset_type) -> Union[AtomEncoder,Embedding,GraphPropertyNodeEncoder]:
     return {
-        'ZINC'              : Sequential(Flatten(),Embedding(28,hidden_dim))              ,
+        'ZINC'              : Embedding(28,hidden_dim)              ,
         'ZINC-Full'         : Embedding(28,hidden_dim)              ,
 
         # OGB/Molecular
