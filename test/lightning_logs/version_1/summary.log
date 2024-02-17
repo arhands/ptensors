@@ -1,119 +1,0 @@
-start date and time : 29/11/2023 21:15:11
-hidden_channels : 128
-num_layers : 4
-dropout : 0.0
-patience : 30
-num_epochs : 1000
-lr : 0.001
-min_lr : 1e-05
-train_batch_size : 128
-cooldown : 0
-subset : False
-eval_batch_size : 512
-run_path : test/
-force_use_cpu : False
-use_old_model : False
-bn_eps : 1e-05
-bn_momentum : 0.1
-ptensor_reduction : mean
-no_cycle2cycle : False
-valid_score_sample_size : 1
-Model SummaryModelHandler(
-  (model): Net(
-    (atom_encoder): Embedding(28, 128)
-    (edge_encoder): Embedding(4, 128)
-    (cycle_encoder): CycleEmbedding1(
-      (emb): Embedding(28, 128)
-    )
-    (layers): ModuleList(
-      (0-3): 4 x ModelLayer(
-        (node_edge): SplitLayer(
-          (lift_mlp): Sequential(
-            (0): Linear(in_features=128, out_features=256, bias=False)
-            (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-            (3): Linear(in_features=256, out_features=128, bias=False)
-            (4): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (5): ReLU(inplace=True)
-          )
-          (lvl_mlp_1): Sequential(
-            (0): Linear(in_features=256, out_features=128, bias=False)
-            (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-          )
-          (lvl_mlp_2): Sequential(
-            (0): Linear(in_features=128, out_features=256, bias=False)
-            (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-            (3): Linear(in_features=256, out_features=128, bias=False)
-            (4): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (5): ReLU(inplace=True)
-          )
-        )
-        (edge_cycle): SplitLayer0_1(
-          (lift_mlp): Sequential(
-            (0): Linear(in_features=256, out_features=256, bias=False)
-            (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-            (3): Linear(in_features=256, out_features=128, bias=False)
-            (4): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (5): ReLU(inplace=True)
-          )
-          (lvl_mlp_1): Sequential(
-            (0): Linear(in_features=384, out_features=128, bias=False)
-            (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-          )
-          (lvl_mlp_2): Sequential(
-            (0): Linear(in_features=128, out_features=256, bias=False)
-            (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (2): ReLU(inplace=True)
-            (3): Linear(in_features=256, out_features=128, bias=False)
-            (4): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (5): ReLU(inplace=True)
-          )
-        )
-        (mlp): Sequential(
-          (0): Linear(in_features=256, out_features=128, bias=False)
-          (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (2): ReLU(inplace=True)
-        )
-        (cycle_cycle): TransferLayer1_1(
-          (transfer): AffineTransfer1_1(
-            (tf_intersect): Linear(in_features=384, out_features=256, bias=False)
-            (tf_invariant): Linear(in_features=256, out_features=256, bias=False)
-            (linmaps_invariant): Linear(in_features=128, out_features=256, bias=False)
-            (linmaps_id): Linear(in_features=128, out_features=256, bias=False)
-          )
-          (mlp): Sequential(
-            (0): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (1): ReLU(inplace=True)
-            (2): Linear(in_features=256, out_features=128, bias=False)
-            (3): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (4): ReLU(inplace=True)
-          )
-        )
-        (mlp_cycle): Sequential(
-          (0): Linear(in_features=256, out_features=128, bias=False)
-          (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (2): ReLU(inplace=True)
-        )
-      )
-    )
-    (pool_mlps): ModuleList(
-      (0-2): 3 x Sequential(
-        (0): Linear(in_features=128, out_features=256, bias=False)
-        (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): ReLU(inplace=True)
-      )
-    )
-    (lin): Linear(in_features=256, out_features=1, bias=True)
-  )
-  (loss_fn): L1Loss()
-  (train_score_fn): MeanAbsoluteError()
-  (valid_score_fn): MeanAbsoluteError()
-  (test_score_fn): MeanAbsoluteError()
-  (running_mean_score_fn): RunningMean(
-    (base_metric): MeanMetric()
-  )
-)
