@@ -55,6 +55,7 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
         logger=logger,#type: ignore
         # **model_summary
         enable_model_summary = False,
+        sync_batchnorm=True,
         # enable_model_summary = show_model_summary
     )
     # print("\n54\n")
