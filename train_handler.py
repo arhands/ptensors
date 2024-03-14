@@ -1,18 +1,8 @@
 import os
 from typing import Any, Literal, Optional
-# from typing import Any, Literal, Optional, overload
 from lightning.pytorch.loggers import TensorBoardLogger
-# from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger, WandbLogger
-# from pytorch_lightning.loggers.wandb import WandbLogger
 from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, ModelCheckpoint, ModelSummary
 from lightning import Trainer
-# import wandb
-
-# def get_dataset_mode(ds: Literal['ZINC','ogbg-molhiv']):
-#     return {
-#         'ZINC' : 'min',
-#         'ogbg-molhiv' : 'max',
-#     }[ds]
 def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: Literal['min','max'],wandb_project_name: Optional[str] = None, args: Optional[dict[str,Any]] = None,pos=0, progress_bar: bool = True, show_model_summary: bool = True) -> tuple[Trainer,int|str]:
     version: int|str
     if wandb_project_name is not None:
@@ -40,13 +30,6 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
         os.mkdir(root_dir + '/lightning_logs/')
     if min_lr is not None:
         callbacks.append(EarlyStopping('lr-Adam',0,max_epochs,mode="min",check_finite=False,stopping_threshold=min_lr))
-    #if trial is not None:
-    #    callbacks.append(PyTorchLightningPruningCallback(trial,'validation_score'))
-    # import logging
-    # console_logger = logging.getLogger('lightning.pytorch')
-    # # console_logger = logging.getLogger('lightning.pytorch.core')
-    # console_logger.addHandler(logging.FileHandler("core2.log"))
-    # print("\n43\n")
     trainer = Trainer(
         default_root_dir=root_dir,
         enable_checkpointing=True,
