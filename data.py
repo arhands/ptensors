@@ -1,6 +1,7 @@
 from __future__ import annotations
 import re
-from typing import Any, Literal, Union, overload
+from typing import Any, Literal, Optional, Union, overload
+import typing
 
 from pandas.core.indexes.base import InvalidIndexError
 from torch import Tensor
@@ -24,23 +25,21 @@ def _object_to_prefix(p:supported_types) -> str:
     'TransferData1' : "tf1",
     'TransferData2' : "tf2",
   }[p.__class__.__name__]
-# def _prefix_to_class(prefix: str):
-#   return {
-#     "ap1" : atomspack1,
-#     "ap2" : atomspack2,
-#     "tf0" : TransferData0,
-#     "tf1" : TransferData1,
-#     "tf2" : TransferData2,
-#   }[prefix]
 
 
 _key_regex: re.Pattern[str] = re.compile("^(" + "|".join(_prefixes) + ")__((_?[0-9a-zA-Z])+)__([0-9a-zA-Z_]+)$")
 class PtensObjects:
+  """
+  A container class for storing ptens objects for easy access.
+  """
   ap1: dict[str,atomspack1]
   ap2: dict[str,atomspack2]
   tf0: dict[tuple[str,str],TransferData0]
+  """Transfer0 maps in the order they were encoded (source,dest)."""
   tf1: dict[tuple[str,str],TransferData1]
+  """Transfer1 maps in the order they were encoded (source,dest)."""
   tf2: dict[tuple[str,str],TransferData2]
+  """Transfer2 maps in the order they were encoded (source,dest)."""
   def __init__(self,ap1,ap2,tf0,tf1,tf2) -> None:
     self.ap1 = ap1
     self.ap2 = ap2
@@ -49,6 +48,7 @@ class PtensObjects:
     self.tf2 = tf2
   @overload
   def get_atomspack(self, key: str, min_order: Literal[0,1]) -> atomspack1:...
+  """Returns the atomspack1 using the specified key."""
   @overload
   def get_atomspack(self, key: str, min_order: Literal[2]) -> atomspack2:...
   def get_atomspack(self, key: str, min_order: Literal[0,1,2]) -> atomspack1|atomspack2:
@@ -56,14 +56,18 @@ class PtensObjects:
         return self.ap1[key]
     else:
       return self.ap2[key]
-
   @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[0]) -> TransferData0:...
+  def get_transferData(self, source: str, dest: str, min_order: Literal[0]) -> TransferData0:...
   @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[1]) -> TransferData1:...
+  def get_transferData(self, source: str, dest: str, min_order: Literal[1]) -> TransferData1:...
   @overload
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[2]) -> TransferData2:...
-  def get_transferData(self, key: tuple[str,str], min_order: Literal[0,1,2]) -> TransferData0|TransferData1|TransferData2:
+  def get_transferData(self, source: str, dest: str, min_order: Literal[2]) -> TransferData2:...
+  def get_transferData(self, source: str, dest: str, min_order: Literal[0,1,2]) -> TransferData0|TransferData1|TransferData2:
+    """
+    Do note that source and dest are expected to be given in the order they were computed in.
+    Do get the reverse, reverse the resulting object once it's returned.
+    """
+    key: tuple[str, str] = (source,dest)
     if min_order == 0 and key in self.tf0:
       return self.tf0[key]
     elif min_order <= 1 and key in self.tf1:
@@ -89,22 +93,28 @@ class PtensObjects:
     return cls(*data.get_ptens_params())
 
   @overload
-  def __getitem__(self, keyOrd: tuple[str,Literal[0,1]]) -> atomspack1:...
+  def __getitem__(self, args: str|tuple[str,Literal[0,1]]) -> atomspack1:...
   @overload
-  def __getitem__(self, keyOrd: tuple[str,Literal[2]]) -> atomspack2:...
+  def __getitem__(self, args: tuple[str,Literal[2]]) -> atomspack2:...
   @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[0]]) -> TransferData0:...
+  def __getitem__(self, args: tuple[str,str]|tuple[str,str,Literal[0]]) -> TransferData0:...
   @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[1]]) -> TransferData1:...
+  def __getitem__(self, args: tuple[str,str,Literal[1]]) -> TransferData1:...
   @overload
-  def __getitem__(self, keyOrd: tuple[tuple[str,str],Literal[2]]) -> TransferData2:...
-  def __getitem__(self, keyOrd: tuple[str|tuple[str,str],Literal[0,1,2]]) -> supported_types:
-    key, min_order = keyOrd
-    # note: this assumes the item exists and has a compatible order
-    if isinstance(key,str):
-      return self.get_atomspack(key,min_order)
-    else:
-      return self.get_transferData(key,min_order)
+  def __getitem__(self, args: tuple[str,str,Literal[2]]) -> TransferData2:...
+  def __getitem__(self, args: str|tuple[str,Literal[0,1,2]]|tuple[str,str]|tuple[str,str,Literal[0,1,2]]) -> supported_types:
+    if isinstance(args,str):
+      return self.get_atomspack(args,0)
+    elif isinstance(args[1],int):
+      args = typing.cast(tuple[str,Literal[0,1,2]],args)
+      return self.get_atomspack(args[0],args[1])
+    elif len(args) == 2:
+      args = typing.cast(tuple[str,str],args)
+      return self.get_transferData(args[0],args[1],0)
+    else: # len(args) == 3
+      args = typing.cast(tuple[str,str,Literal[0,1,2]],args)
+      return self.get_transferData(args[0],args[1],args[2])
+
 
   @overload
   def __setitem__(self, key: str, value: atomspack1|atomspack2):...
@@ -115,13 +125,16 @@ class PtensObjects:
       if isinstance(value,atomspack2):
         self.ap2[key] = value
       else:
-        self.ap1[key] = value#type: ignore
+        value = typing.cast(atomspack1,value)
+        self.ap1[key] = value
     elif isinstance(value,TransferData2):
       self.tf2[key] = value
     elif isinstance(value,TransferData1):
       self.tf1[key] = value
     else:
-      self.tf0[key] = value#type: ignore
+      value = typing.cast(TransferData0,value)
+      self.tf0[key] = value
+  
 # def _atomspack1_inc(data: Data, prefix: str, prop_name: str, key: str, value: Union[Tensor,int]):
 def _atomspack1_inc(data: Data, prop_name: str, value: Tensor|int) -> int|None:
   return {
@@ -206,9 +219,9 @@ def _transferData2_inc(data: FancyDataObject, prefix: str, prop_name: str, key: 
 
 
 class FancyDataObject(Data):
-  # TODO: ensure the below property does not get batched.
-  # tranfer_map_to_atomspacks: dict[str,tuple[str,str]]
-  # """first entry is the source, second is the target"""
+  """
+    Handles the batching of ptens-type objects once they have been pre-processed.
+  """
   def __inc__(self, key: str, value: Any, *args, **kwargs) -> Any:
     parse: re.Match[str] | None  = _key_regex.match(key)
     if parse is not None:
@@ -242,7 +255,7 @@ class FancyDataObject(Data):
     args: dict[str,Any] = dict()
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
-    for k in self.keys():
+    for k in self.keys:#type: ignore
       res: re.Match[str] | None = _key_regex.match(k)
       if res is not None:
         prefix, prop_name, _, key = res.groups()
@@ -277,3 +290,13 @@ class FancyDataObject(Data):
     # assert "_and_" not in source_key
     # assert "_and_" not in target_key
     self._set_ptens_param(f'{source_key}_and_{target_key}',value,['source','num_nodes','target','_atoms2','_domains_indicator2'])
+  @staticmethod
+  def assert_valid_domain_name(name: str) -> None:
+    """
+      A helper method for checking if a name is valid. 
+      This is not called here, but is useful for transforms and
+      such for input validation when they are created.
+    """
+    assert "__" not in name
+    assert "_and_" not in name
+    assert re.match("^[_0-9a-zA-Z]+$",name) is not None

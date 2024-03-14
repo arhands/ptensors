@@ -158,7 +158,6 @@ for dataset in datasetOptions:#type: ignore
             'val_batch_size' : args.eval_batch_size,
             'test_batch_size' : args.eval_batch_size,
             'pre_transform' : pre_transform,
-            'transform' : None,
         }
         if dataset in ['ZINC','ZINC-Full']:
             data_handler = ZINCDatasetHandler(subset = dataset != 'ZINC-Full',**handlerArgs)
@@ -176,8 +175,7 @@ for dataset in datasetOptions:#type: ignore
             show_progress_bar: bool = args.show_epoch_progress_bar
             show_model_summary = trialIdx == 0 and args.enable_model_summary
             trainer, version = get_trainer(run_path,args.num_epochs,args.min_lr,mode,args.wandb_project_name,vars(args),pos,show_progress_bar,show_model_summary=show_model_summary)
-            model = ModelHandler(model,lr,dataset,args.optimizer,1,lr_patience = args.patience, mode=mode, cooldown=0,lr_decay=args.lr_decay)
-            # model = ModelHandler(model,lr,dataset,args.optimizer,1,lr_patience = args.patience, mode=mode, cooldown=0,lr_decay=args.lr_decay, show_model_summary = trialIdx == 0)
+            model = ModelHandler(model,lr,dataset,args.optimizer,lr_patience = args.patience, mode=mode, cooldown=0,lr_decay=args.lr_decay)
             trainer.fit(model,datamodule=data_handler)
             test_result: dict[str,float] = trainer.test(model,ckpt_path='best',datamodule=data_handler,verbose=False)[0]#type: ignore
             run_results.append(test_result)

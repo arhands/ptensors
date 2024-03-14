@@ -1,13 +1,12 @@
-from typing import Any, Callable, Dict, Literal
+from typing import Callable, Literal
 import lightning.pytorch as pl
 from pytorch_optimizer.base.types import OPTIMIZER, PARAMETERS
 from torch.nn import Module
 from torch import Tensor
 import torch
 from data import PtensObjects
-from torchmetrics import MeanAbsoluteError, MeanSquaredError, RunningMean
+from torchmetrics import MeanAbsoluteError, MeanSquaredError
 from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy
-from torch_geometric.data import Batch
 from torch.nn import L1Loss, BCEWithLogitsLoss, MSELoss, CrossEntropyLoss
 from torch.optim import Adam, Optimizer
 from pytorch_optimizer.optimizer.sam import SAM
@@ -72,7 +71,7 @@ class ASAM(SAM):
     def __init__(self, params: PARAMETERS, base_optimizer: OPTIMIZER, rho: float = 0.05, **kwargs):
         super().__init__(params, base_optimizer, rho, True, **kwargs)
     
-    def step(self, closure: Callable[[],Tensor]):
+    def step(self, closure: Callable[[],Tensor]):#type: ignore
         # def wrapped_closure():
         #     loss : Tensor = closure()
         #     loss.backward()
@@ -83,7 +82,7 @@ class ASAM(SAM):
 
 
 class ModelHandler(pl.LightningModule):
-    def __init__(self, model: Module, lr: float, ds: dataset_type, optimizer: Literal['adam','asam'], running_mean_window_size: int = 1, **lr_schedular_args) -> None:
+    def __init__(self, model: Module, lr: float, ds: dataset_type, optimizer: Literal['adam','asam'], **lr_schedular_args) -> None:
         super().__init__()
         # self.save_hyperparameters()
         self.model = model
@@ -91,21 +90,16 @@ class ModelHandler(pl.LightningModule):
         self.train_score_fn = get_score_fn(ds)
         self.valid_score_fn = get_score_fn(ds)
         self.test_score_fn = get_score_fn(ds)
-        # self.running_mean_score_fn = RunningMean(running_mean_window_size)
         self.lr = lr
 
         self.lr_scheduler_args = lr_schedular_args
         self.ds : dataset_type = ds
         self.optimizer_name : Literal['adam','asam'] = optimizer
 
-        # if optimizer == 'asam':
-        #     self.automatic_optimization = False
-
-    def forward(self, x: Tensor, edge_attr: Tensor, data: PtensObjects) -> Tensor:
-        # TODO: remove flatten :(
+    def forward(self, x: Tensor, edge_attr: Tensor, data: PtensObjects) -> Tensor:#type: ignore
         return self.model(x,edge_attr,data)
     
-    def training_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):
+    def training_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
         x: Tensor
         edge_attr: Tensor
         y: Tensor
@@ -121,23 +115,15 @@ class ModelHandler(pl.LightningModule):
         self.log('train_loss',loss,True,batch_size=len(y),on_step=False,on_epoch=True)
         self.log('train_score',self.train_score_fn,True,batch_size=len(y),on_step=False,on_epoch=True)
 
-        # if self.optimizer_name == 'asam':
-        #     self.manual_backward(loss,retain_graph=True)
-        #     opt : SAM = self.optimizers(False) #type: ignore
-        #     opt.first_step(True)
-
-        #     self.manual_backward(loss)
-        #     self.loss_fn(pred,batch.y)
-        #     opt.second_step(True)
         return loss
-    def validation_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):
+    def validation_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
         x: Tensor
         edge_attr: Tensor
         y: Tensor
         data: PtensObjects
         x, edge_attr, y, data = batch
         self.valid_score_fn(self(x,edge_attr,data),y)
-    def test_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):
+    def test_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
         x: Tensor
         edge_attr: Tensor
         y: Tensor
@@ -145,12 +131,8 @@ class ModelHandler(pl.LightningModule):
         x, edge_attr, y, data = batch
         self.test_score_fn(self(x,edge_attr,data),y)
     def on_validation_epoch_end(self) -> None:
-        self.log('lr-Adam',self.optimizers(False).param_groups[0]['lr'])
-        # valid_score = self.valid_score_fn.compute()
-        # self.valid_score_fn.reset()
+        self.log('lr-Adam',self.optimizers(False).param_groups[0]['lr'])#type: ignore
         self.log('val_score',self.valid_score_fn,on_epoch=True,prog_bar=True)
-        # self.running_mean_score_fn.update(valid_score)
-        # self.log('val_score_multi',self.running_mean_score_fn.compute(),on_epoch=True)
     def on_test_epoch_end(self) -> None:
         self.log('test_score',self.test_score_fn,on_epoch=True)
 

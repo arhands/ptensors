@@ -1,6 +1,8 @@
 from __future__ import annotations
 from math import inf
 from typing import Any, Literal, NamedTuple, Optional, overload
+import typing
+from click import Option
 import torch
 from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
@@ -103,61 +105,127 @@ class AddChordlessCycles(AddAtomspack):
     self.undirected = undirected
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
     # G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
-    # cycles: list[list[int]] = nx.chordless_cycles(G,self.max_size)#type: ignore
     cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)#type: ignore
     return [torch.tensor(c.to_list()) for c in cycles]
 
 #################################################################################################################################
 # dataset specific transforms
 #################################################################################################################################
-class TUPreprocessingBase(BaseTransform):
-  def __init__(self, ds: str) -> None:
-    super().__init__()
-    self.is_multilabel = ds in ['COLLAB','IMDB-MULTI','ENZYMES']
-    self.ignore_degree = ds == 'REDDIT_BINARY'
-  @overload
-  def __call__(self, data: FancyDataObject) -> FancyDataObject:...
-  @overload
-  def __call__(self, data: Data) -> Data:...
-  def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
-    if data.x is not None:
-        data.x = data.x.argmax(1)#type: ignore
-    else:
-        # data.x = torch.empty(data.num_nodes,dtype=torch.int8) # since we only care about the size.
-        if self.ignore_degree:
-            data.x = torch.zeros(data.num_nodes,dtype=torch.int8)#type: ignore
-        else:
-            data.x = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)#type: ignore
-    if data.edge_attr is not None:
-        if data.edge_attr.ndim > 1:
-            data.edge_attr = data.edge_attr.argmax(1)#type: ignore
-    else:
-        if self.ignore_degree:
-            data.edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)#type: ignore
-        else:
-            deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
-            data.edge_attr = deg[data.edge_index].transpose(1,0)#type: ignore
-        # data.edge_attr = torch.empty(data.edge_index.size(1),dtype=torch.int8) # since we only care about the size.
-    if self.is_multilabel:
-        if data.y.ndim > 1:
-            data.y = data.y.squeeze()#type: ignore
-        assert data.y.ndim == 1
-        data.y = data.y.long()#type: ignore
-    elif data.y.ndim == 1:
-        data.y = data.y.unsqueeze(-1).float()#type: ignore
+# class TUPreprocessingBase(BaseTransform):
+#   def __init__(self, ds: str) -> None:
+#     super().__init__()
+#     self.is_multilabel = ds in ['COLLAB','IMDB-MULTI','ENZYMES']
+#     self.ignore_degree = ds == 'REDDIT_BINARY'
+#   @overload
+#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
+#   @overload
+#   def __call__(self, data: Data) -> Data:...
+#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
+#     if data.x is not None:
+#         data.x = data.x.argmax(1)#type: ignore
+#     else:
+#         # data.x = torch.empty(data.num_nodes,dtype=torch.int8) # since we only care about the size.
+#         if self.ignore_degree:
+#             data.x = torch.zeros(data.num_nodes,dtype=torch.int8)#type: ignore
+#         else:
+#             data.x = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)#type: ignore
+#     if data.edge_attr is not None:
+#         if data.edge_attr.ndim > 1:
+#             data.edge_attr = data.edge_attr.argmax(1)#type: ignore
+#     else:
+#         if self.ignore_degree:
+#             data.edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)#type: ignore
+#         else:
+#             deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+#             data.edge_attr = deg[data.edge_index].transpose(1,0)#type: ignore
+#         # data.edge_attr = torch.empty(data.edge_index.size(1),dtype=torch.int8) # since we only care about the size.
+#     if self.is_multilabel:
+#         if data.y.ndim > 1:
+#             data.y = data.y.squeeze()#type: ignore
+#         assert data.y.ndim == 1
+#         data.y = data.y.long()#type: ignore
+#     elif data.y.ndim == 1:
+#         data.y = data.y.unsqueeze(-1).float()#type: ignore
     
-    # TODO: find a better way to handle V, maybe.
-    # if data.is_directed:
-    #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
+#     # TODO: find a better way to handle V, maybe.
+#     # if data.is_directed:
+#     #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
 
-    return data
-
-class ZINCPreProcessingBase(BaseTransform):
+#     return data
+encoding_flags = Literal['OGB','degree',None]
+label_type = Literal['single-dim','multi-label','multi-class']
+class StandardPreprocessing(BaseTransform):
+  label: label_type
+  node_encoding: encoding_flags
+  edge_encoding: encoding_flags
+  def __init__(self, label: label_type, node_encoding: encoding_flags, edge_encoding: encoding_flags) -> None:
+    """NOTE: encoding just gives some flags for how you want it to process."""
+    super().__init__()
+    self.label = label
+    self.node_encoding = node_encoding
+    self.edge_encoding = edge_encoding
   @overload
   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
   @overload
   def __call__(self, data: Data) -> Data:...
   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
-    data.x = data.x.flatten()#type: ignore
-    data.y = data.y.unsqueeze(-1)#type: ignore
+    # node proc
+    x: Tensor|None = data.x
+    deg: None|Tensor = None
+    if x is None:
+      if self.node_encoding == 'degree':
+        deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+        x = deg
+      else:
+        x = torch.zeros(data.num_nodes,dtype=torch.int8)#type: ignore
+    elif self.node_encoding != 'OGB':
+      # we want to ensure standard one-hot form.
+      if x.ndim == 2:
+        x = x.argmax(1)
+      else:
+        x = x.long()
+    data.x = x#type: ignore
+
+    # edge proc
+    edge_attr: Tensor|None = data.edge_attr
+    if edge_attr is None:
+      if self.edge_encoding == 'degree':
+        if deg is None:
+          deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
+        edge_attr = deg[data.edge_index].transpose(1,0)
+      else:
+        edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)
+    elif self.edge_encoding != 'OGB' and edge_attr.ndim == 2:
+      edge_attr = edge_attr.argmax(1)
+    data.edge_attr = edge_attr#type: ignore
+
+    # graph labels
+    y: Tensor = data.y
+    if self.label == 'multi-class':
+      if y.ndim > 1:
+        y = y.squeeze()
+      y = y.long()
+    elif self.label == 'single-dim':
+      y = y.view(-1,1).float()
+    data.y = y#type: ignore
+
     return data
+
+# class ZINCPreProcessingBase(BaseTransform):
+#   @overload
+#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
+#   @overload
+#   def __call__(self, data: Data) -> Data:...
+#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
+#     data.x = data.x.flatten()#type: ignore
+#     data.y = data.y.unsqueeze(-1)#type: ignore
+#     return data
+
+# class OGBPreprocessingBase(BaseTransform):
+#   @overload
+#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
+#   @overload
+#   def __call__(self, data: Data) -> Data:...
+#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
+#     data.y = data.y.float()
+#     return data

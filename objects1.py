@@ -1,5 +1,7 @@
+"""
+objects used for zeroth and first order interactions.
+"""
 from __future__ import annotations
-from typing import Any, NamedTuple, Optional, Union
 import torch
 from torch import Tensor
 from torch_geometric.data import Data
@@ -37,6 +39,7 @@ class atomspack1:
             incidence[~incidence_mask] = False
         incidence = incidence.to_sparse_coo().coalesce()
         return incidence.indices()
+    # TODO: add utilization for the below implementation
     # def overlaps1(self, other: atomspack1):
     #     r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
     #     if len(self.atoms) == 0 or len(other.atoms) == 0:
@@ -93,40 +96,14 @@ class atomspack1:
             s += f'\t{self.atoms[self.domain_indicator == i].tolist()}\n'
         return s
 
-# class atomspack3_minimal(atomspack2):
-#     r"""
-#     A minimal object for computing scaled dot product attention.
-#     """
-#     # atoms3: Tensor
-#     # # diagonals
-#     # ij_to_iij_indicator : Tensor
-#     # ij_to_iji_indicator : Tensor
-#     # ij_to_jii_indicator : Tensor
-    
-#     ij_to_ijk_indicator : Tensor
-#     ij_to_ikj_indicator : Tensor
-#     # ij_to_kij_indicator : Tensor
-
-# class atomspack3_strict(atomspack3_minimal):
-#     r"""
-#     A minimal object for performing "strict" transforms between ptensor 2's and ptensor 3's.
-#     "strict" here means we only consider maps with 2nd order equivariance.
-#     """
-#     atoms3: Tensor
-#     # diagonals
-#     ij_to_iij_indicator : Tensor
-#     ij_to_iji_indicator : Tensor
-#     ij_to_jii_indicator : Tensor
-    
-#     # ij_to_ijk_indicator : Tensor
-#     # ij_to_ikj_indicator : Tensor
-#     ij_to_kij_indicator : Tensor
-
 class TransferData0:
     source: atomspack1
     target: atomspack1
 
     domain_map_edge_index: Tensor
+    r"""Represents an edge-index s.t. if P-Tensor i in the source layer maps to P-Tensor j in the target layer,
+        then (and only then) [i,j]\in domain_map_edge_index.T
+    """
 
     def __init__(self,source,target,domain_map_edge_index):
         self.source = source
@@ -153,13 +130,11 @@ class TransferData0:
     @classmethod
     def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
         # computing nodes in the target domains that are intersected with.
-        # overlaps = source.overlaps1(target)
-        overlaps = source.overlaps1(target,ensure_sources_subgraphs)
-        source_domains = source.domain_indicator[overlaps[0]]
-        target_domains = target.domain_indicator[overlaps[1]]
+        overlaps: Tensor = source.overlaps1(target,ensure_sources_subgraphs)
+        source_domains: Tensor = source.domain_indicator[overlaps[0]]
+        target_domains: Tensor = target.domain_indicator[overlaps[1]]
         
-        # 'intersect_indicator' represents the map from the source/target tensors to the intersections.
-        domain_overlaps_edge_index = torch.stack([source_domains,target_domains]).unique(dim=1)
+        domain_overlaps_edge_index: Tensor = torch.stack([source_domains,target_domains]).unique(dim=1)
         
         return cls(
             source,
@@ -168,8 +143,20 @@ class TransferData0:
 
 class TransferData1(TransferData0):
     node_map_edge_index: Tensor
+    r"""
+    If some node i appears in P-Tensors j in the source layer and k in the target layer and we map
+    from j to k, then node_map_edge_index will have an edge incidendent from where i appears in the 
+    j in the source 1st order P-tensor layer to where it appears in the k in the 1st order target P-Tensor layer.
+    """
     intersect_indicator: Tensor
+    r"""
+    When mapping a pair of P-Tensors i and j in some P-Tensor layer, one can consider
+    the node-wise maps given by 'node_map_edge_index' and the P-Tensor wise maps given
+    by 'domain_map_edge_index'. 'intersect_indicator' broadcasts the intermediate messages from
+    the domain-wise messages to the node-wise messages.
+    """
     num_nodes: int
+    """The number of nodes in the original graph."""
     def __init__(self,source,target,domain_map_edge_index,node_map_edge_index,num_nodes,intersect_indicator):
         super().__init__(source,target,domain_map_edge_index)
         self.node_map_edge_index = node_map_edge_index
@@ -181,10 +168,11 @@ class TransferData1(TransferData0):
         self.node_map_edge_index = self.node_map_edge_index.to(device)
         self.intersect_indicator = self.intersect_indicator.to(device)
 
-    def copy(self):
+    def copy(self) -> "TransferData1":
         return TransferData1(**self.__dict__)
     
     def reverse(self, in_place: bool = False) -> TransferData1:
+        """Reverses the direction of the linear map."""
         if not in_place:
             return self.copy().reverse(True)
         
@@ -192,11 +180,14 @@ class TransferData1(TransferData0):
         self.node_map_edge_index = self.node_map_edge_index.flip(0)
         return self
 
-    # def from_atomspacks(cls, source: atomspack1, target: atomspack1):
     @classmethod
     def from_atomspacks(cls, source: atomspack1, target: atomspack1, ensure_sources_subgraphs: bool):
+        r"""
+            On input of source and target atomspacks, generates a second order transfer map.
+            'ensure_sources_subgraphs' makes it so that if we map from domain A\in source to domain B\in target,
+            then A must be a subset of B.
+        """
         # computing nodes in the target domains that are intersected with.
-        # overlaps = source.overlaps1(target)
         overlaps = source.overlaps1(target,ensure_sources_subgraphs)
         source_domains = source.domain_indicator[overlaps[0]]
         target_domains = target.domain_indicator[overlaps[1]]

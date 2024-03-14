@@ -192,13 +192,13 @@ class ModelLayer(Module):
             )
         
     def forward(self, node_rep: Tensor, edge_rep: Tensor, cycle_rep: Tensor, data: PtensObjects) -> tuple[Tensor,Tensor,Tensor]:
-        node_out, edge_out_1 = self.node_edge(node_rep,edge_rep,data[(('nodes','edges'),0)])
-        edge_out_2, cycle_out = self.edge_cycle(edge_rep,cycle_rep,data[(('edges','cycles'),1)])
+        node_out, edge_out_1 = self.node_edge(node_rep,edge_rep,data['nodes','edges',0])
+        edge_out_2, cycle_out = self.edge_cycle(edge_rep,cycle_rep,data['edges','cycles',1])
 
         edge_out = self.mlp(torch.cat([edge_out_1,edge_out_2],-1))
 
         if self.include_cycle_cycle:
-            cycle_out_2 = self.cycle_cycle(cycle_rep,data[(('cycles','cycles'),1)])
+            cycle_out_2 = self.cycle_cycle(cycle_rep,data['cycles','cycles',1])
             cycle_out = self.mlp_cycle(cycle_out_2)
 
         node_out = F.dropout(node_out,self.dropout,self.training)
@@ -248,7 +248,7 @@ class Net(Module):
         # initializing model
         node_rep = self.atom_encoder(x)
         edge_rep = self.edge_encoder(edge_attr)
-        cycle_rep = self.cycle_encoder(x,data[(('nodes','cycles'),1)])
+        cycle_rep = self.cycle_encoder(x,data['nodes','cycles',1])
 
         # performing message passing
         for layer in self.layers:
