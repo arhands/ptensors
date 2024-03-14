@@ -8,7 +8,6 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_networkx, degree
 from torch import Tensor
-# import networkx as nx
 from data import FancyDataObject, supported_types, PtensObjects
 from objects1 import atomspack1, TransferData0, TransferData1
 from objects2 import atomspack2, TransferData2
@@ -111,47 +110,6 @@ class AddChordlessCycles(AddAtomspack):
 #################################################################################################################################
 # dataset specific transforms
 #################################################################################################################################
-# class TUPreprocessingBase(BaseTransform):
-#   def __init__(self, ds: str) -> None:
-#     super().__init__()
-#     self.is_multilabel = ds in ['COLLAB','IMDB-MULTI','ENZYMES']
-#     self.ignore_degree = ds == 'REDDIT_BINARY'
-#   @overload
-#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
-#   @overload
-#   def __call__(self, data: Data) -> Data:...
-#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
-#     if data.x is not None:
-#         data.x = data.x.argmax(1)#type: ignore
-#     else:
-#         # data.x = torch.empty(data.num_nodes,dtype=torch.int8) # since we only care about the size.
-#         if self.ignore_degree:
-#             data.x = torch.zeros(data.num_nodes,dtype=torch.int8)#type: ignore
-#         else:
-#             data.x = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)#type: ignore
-#     if data.edge_attr is not None:
-#         if data.edge_attr.ndim > 1:
-#             data.edge_attr = data.edge_attr.argmax(1)#type: ignore
-#     else:
-#         if self.ignore_degree:
-#             data.edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)#type: ignore
-#         else:
-#             deg = degree(data.edge_index[0],data.num_nodes,dtype=torch.int32)
-#             data.edge_attr = deg[data.edge_index].transpose(1,0)#type: ignore
-#         # data.edge_attr = torch.empty(data.edge_index.size(1),dtype=torch.int8) # since we only care about the size.
-#     if self.is_multilabel:
-#         if data.y.ndim > 1:
-#             data.y = data.y.squeeze()#type: ignore
-#         assert data.y.ndim == 1
-#         data.y = data.y.long()#type: ignore
-#     elif data.y.ndim == 1:
-#         data.y = data.y.unsqueeze(-1).float()#type: ignore
-    
-#     # TODO: find a better way to handle V, maybe.
-#     # if data.is_directed:
-#     #     data.edge_index,data.edge_attr = to_undirected(data.edge_index,data.edge_attr,num_nodes=data.num_nodes)
-
-#     return data
 encoding_flags = Literal['OGB','degree',None]
 label_type = Literal['single-dim','multi-label','multi-class']
 class StandardPreprocessing(BaseTransform):
