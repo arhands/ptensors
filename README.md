@@ -26,57 +26,57 @@ Now, refer to the following table for reproducing experiments:
   <tr>
     <td>ZINC-12K</td>
     <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/zinc_subset.sh">zinc_subset.sh</a></td>
-    <td>0.075±0.003</td>
+    <td>0.075±0.003 (↓)</td>
   </tr>
 
   <tr>
     <td>ZINC-Full</td>
     <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/zinc_full.sh">zinc_full.sh</a></td>
-    <td>0.024±0.001*</td>
+    <td>0.024±0.001* (↓)</td>
   </tr>
   
   <tr>
     <td>OGBG-MolHIV</td>
     <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/ogbmol_hiv.sh">ogbmol_hiv.sh</a></td>
-    <td>80.47±0.87</td>
+    <td>80.47±0.87 (↑)</td>
   </tr>
   
   <tr>
     <td>Tox21</td>
     <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/moltox21.sh">moltox21.sh</a></td>
-    <td>84.95±0.58</td>
+    <td>84.95±0.58 (↑)</td>
   </tr>
   
   <tr>
     <td>MUTAG</td>
     <td rowspan="3"><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/tudatasets_set1.sh">tudatasets_set1.sh</a></td>
-    <td>92.9±1.7</td>
+    <td>92.9±1.7 (↑)</td>
   </tr>
   
   <tr>
     <td>PTC</td>
-    <td>71.7±5.2</td>
+    <td>71.7±5.2 (↑)</td>
   </tr>
   
   <tr>
     <td>NCI1</td>
-    <td>84.2±1.7</td>
+    <td>84.2±1.7 (↑)</td>
   </tr>
   
   <tr>
     <td>PROTEINS</td>
     <td rowspan="3"><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/tudatasets_set2.sh">tudatasets_set2.sh</a></td>
-    <td>75.9±2.5</td>
+    <td>75.9±2.5 (↑)</td>
   </tr>
   
   <tr>
     <td>IMDB-B</td>
-    <td>77.9±3.2</td>
+    <td>77.9±3.2 (↑)</td>
   </tr>
   
   <tr>
     <td>IMDB-M</td>
-    <td>54.3±2.0</td>
+    <td>54.3±2.0 (↑)</td>
   </tr>
   
 </table>
