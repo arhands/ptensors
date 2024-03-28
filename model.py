@@ -199,7 +199,7 @@ class ModelLayer(Module):
 
         if self.include_cycle_cycle:
             cycle_out_2 = self.cycle_cycle(cycle_rep,data['cycles','cycles',1])
-            cycle_out = self.mlp_cycle(cycle_out_2)
+            cycle_out = self.mlp_cycle(torch.cat([cycle_out,cycle_out_2],-1))
 
         node_out = F.dropout(node_out,self.dropout,self.training)
         edge_out = F.dropout(edge_out,self.dropout,self.training)
