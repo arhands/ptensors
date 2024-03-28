@@ -124,7 +124,6 @@ datasetOptions: list[str] = [
     v['dataset']
     for v in get_arg_combinations(['dataset'])
 ]
-
 bestArgs = dict()
 dataset: dataset_type
 dsLoop = tqdm(datasetOptions,"ds",len(datasetOptions))
@@ -217,11 +216,17 @@ for dataset in datasetOptions:#type: ignore
                 **argChoices
             }
     bestArgs[dataset] = bestDatasetArgs
-
-print("Summary of results:")
+summary_lines: list[str] = []
+def log(val: str = ""):
+    print(val)
+    summary_lines.append(val + "\n")
+log("Summary of results:")
 for ds in bestArgs:
-    print(f"\t{ds}:")
+    log(f"\t{ds}:")
     dsBestArgs: dict[str,float] = bestArgs[ds]
     for key in dsBestArgs:
-        print(f"\t\t{key}: {dsBestArgs[key]}")
-    print()
+        log(f"\t\t{key}: {dsBestArgs[key]}")
+    log()
+
+with open(run_path + "results.log",'w') as F:
+    F.writelines(summary_lines)
