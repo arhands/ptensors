@@ -3,7 +3,6 @@ import re
 from typing import Any, Literal, Optional, Union, overload
 import typing
 
-from pandas.core.indexes.base import InvalidIndexError
 from torch import Tensor
 import torch
 from torch_geometric.data import Data
@@ -167,7 +166,7 @@ def _transfer_map_to_atomspacks_attr(data: FancyDataObject, key: str, attr: str,
     if hasattr(data,f'{_prefix}__{attr}__{source}'):
       # NOTE: we assume source and target will always exist with the same order.
       return getattr(data,f'{_prefix}__{attr}__{source}'), getattr(data,f'{_prefix}__{attr}__{target}')
-  raise InvalidIndexError
+  raise Exception
 
 
 
@@ -255,7 +254,7 @@ class FancyDataObject(Data):
     args: dict[str,Any] = dict()
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
-    for k in self.keys:#type: ignore
+    for k in self.keys():#type: ignore
       res: re.Match[str] | None = _key_regex.match(k)
       if res is not None:
         prefix, prop_name, _, key = res.groups()
@@ -268,7 +267,7 @@ class FancyDataObject(Data):
         elif prefix[:2] == 'tf':
           transfer_objects[int(prefix[-1])].append((*key.split("_and_"),key))#type: ignore
         else:
-          raise InvalidIndexError(prefix)
+          raise Exception(prefix)
     #
     ap1: dict[str,atomspack1] = {key: atomspack1(**args[key]) for key in atomspack_objects[0]}
     ap2: dict[str,atomspack2] = {key: atomspack2(**args[key]) for key in atomspack_objects[1]}
