@@ -254,7 +254,7 @@ class FancyDataObject(Data):
     args: dict[str,Any] = dict()
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
-    for k in self.keys():#type: ignore
+    for k in self.keys:#type: ignore
       res: re.Match[str] | None = _key_regex.match(k)
       if res is not None:
         prefix, prop_name, _, key = res.groups()

@@ -161,6 +161,7 @@ for dataset in datasetOptions:#type: ignore
         }
         if dataset in ['ZINC','ZINC-Full']:
             data_handler = ZINCDatasetHandler(subset = dataset != 'ZINC-Full',**handlerArgs)
+            dataset = 'ZINC'
         elif dataset in ['ogbg-molhiv','ogbg-moltox21']:
             data_handler = OGBGDatasetHandler(ds_name=dataset,**handlerArgs)#type: ignore
         elif dataset in _tu_datasets:
