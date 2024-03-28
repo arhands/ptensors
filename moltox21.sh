@@ -9,5 +9,5 @@ python3 main.py                 \
   --optimizer=adam              \
   --show_epoch_progress_bar     \
   --bn_momentum=0.01            \
-  --num_epochs=300              \
-  --wandb_project_name=moltox21
+  --num_epochs=300
+  # --wandb_project_name=moltox21

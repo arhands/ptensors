@@ -11,5 +11,6 @@ python3 main.py             \
   --readout=sum             \
   --patience=80             \
   --show_epoch_progress_bar \
-  --include_cycle2cycle     \
-  --wandb_project_name=ZINC_full
+  --num_trials=4            \
+  --include_cycle2cycle
+  # --wandb_project_name=ZINC_full

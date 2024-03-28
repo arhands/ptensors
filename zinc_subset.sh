@@ -10,5 +10,5 @@ python3 main.py             \
   --ptensor_reduction=sum   \
   --readout=sum             \
   --patience=30             \
-  --show_epoch_progress_bar \
-  --wandb_project_name=ZINC_subset
+  --show_epoch_progress_bar
+  # --wandb_project_name=ZINC_subset

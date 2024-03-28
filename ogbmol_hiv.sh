@@ -10,5 +10,5 @@ python3 main.py             \
   --show_epoch_progress_bar \
   --lr=0.0001               \
   --num_epochs=200          \
-  --max_cycle_size=6        \
-  --wandb_project_name=ogbg_molhiv
+  --max_cycle_size=6
+  # --wandb_project_name=ogbg_molhiv
