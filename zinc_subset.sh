@@ -7,7 +7,7 @@ python3 main.py             \
   --train_batch_size=128    \
   --bn_momentum=0.05        \
   --lr_decay=0.5            \
-  --ptensor_reduction=mean  \
+  --ptensor_reduction=sum   \
   --readout=sum             \
   --patience=30             \
   --show_epoch_progress_bar \

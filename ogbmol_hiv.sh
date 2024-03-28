@@ -8,5 +8,7 @@ python3 main.py             \
   --readout=mean            \
   --optimizer=asam          \
   --show_epoch_progress_bar \
-  --num_epochs=200 \
+  --lr=0.0001               \
+  --num_epochs=200          \
+  --max_cycle_size=6        \
   --wandb_project_name=ogbg_molhiv
