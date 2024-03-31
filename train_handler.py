@@ -4,6 +4,7 @@ from lightning.pytorch.callbacks import ModelSummary
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, ModelCheckpoint
 from lightning import Trainer
+import torch
 
 # def get_dataset_mode(ds: Literal['ZINC','ogbg-molhiv']):
 #     return {
@@ -36,6 +37,9 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
         #logger=logger,
         max_epochs=max_epochs,
         logger=(csv_logger,tb_logger),
+        # Sometimes lightning gets confused and thinks pytorch is not
+        # available when it actually is.
+        accelerator="gpu" if torch.cuda.is_available() else "auto",
         # reload_dataloaders_every_n_epochs = 100
     )
     #trainer.early_stopping_callback = early_stop_callback # type: ignore

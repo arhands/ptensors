@@ -19,11 +19,7 @@ from tqdm import tqdm
 # filterwarnings("ignore",category=UserWarning)
 
 
-# datasets = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
-# datasets = ['MUTAG','PROTEINS','IMDB-BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
-# datasets = ['IMDB-MULTI','NCI1','NCI109','PTC_MR']
-datasets = ['PROTEINS']
-# datasets = ['NCI1','NCI109','PTC_MR']
+datasets = ['MUTAG','PROTEINS','IMDB-BINARY','IMDB-MULTI','NCI1','PTC_MR']
 device = 'cpu' if not is_available() else 'cuda'
 
 
@@ -74,16 +70,17 @@ def evaluate_dataset(ds_path, dataset: tu_dataset_type, num_folds: int, seed:int
                     best_std = std
                     param_loop.set_postfix(best_mean=best_mean,best_std=best_std)
                 param_loop.update()
+    csv_logger.log_metrics({'best_score_mean':best_mean,'best_score_std':best_std})#type: ignore
 
-# def ensure_exists(path: str):
-#     base = ''
-#     for segment in path.split('/'):
-#         base = f'{base}{segment}/'
-#         if not os.path.exists(base):
-#             os.mkdir(base)
+def ensure_exists(path: str):
+    base = ''
+    for segment in path.split('/'):
+        base = f'{base}{segment}/'
+        if not os.path.exists(base):
+            os.mkdir(base)
 
 
 
 for dataset in datasets:
-    # ensure_exists(f'runs/tudatasets/{dataset}')
-    evaluate_dataset('data',dataset,2,0) #type: ignore
+    ensure_exists(f'runs/tudatasets/{dataset}')
+    evaluate_dataset('data',dataset,10,0) #type: ignore

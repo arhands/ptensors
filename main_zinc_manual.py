@@ -2,6 +2,8 @@
 from torch.cuda import is_available
 from argparse import ArgumentParser
 from datetime import datetime
+
+import torch_geometric
 from utils import get_run_path
 from model_handler import ModelHandler
 from data_handler import DataHandler
@@ -34,9 +36,12 @@ parser.add_argument('--bn_momentum',type=float,default=0.1)
 parser.add_argument('--ptensor_reduction',type=str,default='mean')
 parser.add_argument('--no_cycle2cycle',action='store_true')
 parser.add_argument('--valid_score_sample_size',type=int,default=1)
+parser.add_argument('--seed',type=int,default=None)
 
 args = parser.parse_args()
-
+seed = args.seed
+if seed is not None:
+    torch_geometric.seed_everything(seed)
 dataset = 'ZINC'
 
 def get_ds_path(old_model: bool, c2c: bool, subset: bool):
