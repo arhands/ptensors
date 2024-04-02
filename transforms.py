@@ -185,7 +185,8 @@ class TUDatasetPreprocessor(BaseTransform):
 #         data.num_nodes = len(data.x)
 #         return data
 
-
+import networkx as nx
+from torch_geometric.utils import to_networkx
 class PreprocessTransform(BaseTransform):
     def __init__(self, max_cycle_size: Union[int,float] = math.inf, include_cycle_map: bool = False) -> None:
         super().__init__()
@@ -204,7 +205,6 @@ class PreprocessTransform(BaseTransform):
         edge_mask = edge_index[0] < edge_index[1]
         inc_edge_index = edge_index[:,edge_mask]
         data.edge_attr = data.edge_attr
-        del data.edge_index
         data.edge_attr = data.edge_attr[edge_mask]
 
         num_edges = len(data.edge_attr)
@@ -215,10 +215,13 @@ class PreprocessTransform(BaseTransform):
         ])
         data.edge_batch = torch.zeros(num_edges,dtype=torch.int64)
         # getting cycle related maps
-        cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes),self.max_cycle_size)
+        cycles = list(nx.simple_cycles(to_networkx(data_,to_undirected=True),self.max_cycle_size if self.max_cycle_size != math.inf else None))#type: ignore
+        del data.edge_index
+        # cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes),self.max_cycle_size)
+        # cycles = get_induced_cycles(from_edge_index(edge_index,num_nodes),self.max_cycle_size)
         data.num_cycles = len(cycles)
         
-        cycles = [c.to_list() for c in cycles]
+        # cycles = [c.to_list() for c in cycles]
         cycles = atomspack1.from_list(cycles)
         edge2cycle : TransferData1 = TransferData1.from_atomspacks(edges,cycles,True)
         data.set_edge2cycle_4(edge2cycle)
