@@ -5,7 +5,7 @@ from lightning.pytorch.callbacks import TQDMProgressBar, EarlyStopping, ModelChe
 from lightning import Trainer
 def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: Literal['min','max'],wandb_project_name: Optional[str] = None, args: Optional[dict[str,Any]] = None,pos=0, progress_bar: bool = True, show_model_summary: bool = True) -> tuple[Trainer,int|str]:
     version: int|str
-    if wandb_project_name is not None:
+    if wandb_project_name is not None and False:
         assert args is not None
         from lightning.pytorch.loggers.wandb import WandbLogger
         logger = WandbLogger(wandb_project_name,root_dir)
@@ -37,8 +37,9 @@ def get_trainer(root_dir: str, max_epochs: int, min_lr: Optional[float], mode: L
         max_epochs=max_epochs,
         logger=logger,#type: ignore
         # **model_summary
-        enable_model_summary = False,
-        sync_batchnorm=True,
+        enable_model_summary = True,
+        # enable_model_summary = False,
+        # sync_batchnorm=True,
         # enable_model_summary = show_model_summary
     )
     # print("\n54\n")

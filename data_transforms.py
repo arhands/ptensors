@@ -12,6 +12,7 @@ from data import FancyDataObject, supported_types, PtensObjects
 from objects1 import atomspack1, TransferData0, TransferData1
 from objects2 import atomspack2, TransferData2
 from induced_cycle_finder import get_induced_cycles, from_edge_index
+import networkx as nx
 
 class GeneratePtensObject(BaseTransform):
   def __init__(self, atomspacks: list[AddAtomspack], transfers: list[AddTransferMap]) -> None:
@@ -103,9 +104,10 @@ class AddChordlessCycles(AddAtomspack):
     self.max_size = max_size
     self.undirected = undirected
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
-    # G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
-    cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)#type: ignore
-    return [torch.tensor(c.to_list()) for c in cycles]
+    G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
+    return [torch.tensor(c) for c in nx.simple_cycles(G,self.max_size)]#type: ignore
+    # cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)#type: ignore
+    # return [torch.tensor(c.to_list()) for c in cycles]
 
 #################################################################################################################################
 # dataset specific transforms
@@ -139,7 +141,10 @@ class StandardPreprocessing(BaseTransform):
     elif self.node_encoding != 'OGB':
       # we want to ensure standard one-hot form.
       if x.ndim == 2:
-        x = x.argmax(1)
+        if  x.size(1) > 1:
+          x = x.argmax(1)
+        else:
+          x = x.flatten()
       else:
         x = x.long()
     data.x = x#type: ignore
@@ -154,7 +159,10 @@ class StandardPreprocessing(BaseTransform):
       else:
         edge_attr = torch.zeros(data.edge_index.size(1),1,dtype=torch.int8)
     elif self.edge_encoding != 'OGB' and edge_attr.ndim == 2:
-      edge_attr = edge_attr.argmax(1)
+      if edge_attr.size(1) > 1:
+        edge_attr = edge_attr.argmax(1)
+      else:
+        edge_attr = edge_attr.flatten()
     data.edge_attr = edge_attr#type: ignore
 
     # graph labels

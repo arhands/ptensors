@@ -23,6 +23,14 @@ class atomspack1:
         if isinstance(num_domains,Tensor):
             num_domains = int(num_domains.sum().item())
         self.num_domains = num_domains
+    def get_batch0(self) -> Tensor:
+        if isinstance(self.raw_num_domains,int):
+            return torch.zeros(self.raw_num_domains,device=self.atoms.device,dtype=torch.int)
+        else:
+            batch_size: int = len(self.raw_num_domains)
+            return torch.repeat_interleave(torch.arange(batch_size,device=self.atoms.device),self.raw_num_domains)
+    def get_batch1(self) -> Tensor:
+        return self.get_batch0()[self.domain_indicator]
     def overlaps1(self, other: atomspack1, ensure_source_subgraphs: bool):
         r"""ensure subgraphs: only include connects where the subgraphs in 'self' are subgraphs to those in 'other'."""
         if len(self.atoms) == 0 or len(other.atoms) == 0:
@@ -95,6 +103,17 @@ class atomspack1:
         for i in range(self.domain_indicator.max() + 1):
             s += f'\t{self.atoms[self.domain_indicator == i].tolist()}\n'
         return s
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value,atomspack1):
+            return False
+        for key in vars(self):
+            check: bool|Tensor = getattr(self,key) == getattr(value,key)
+            if isinstance(check,Tensor):
+                check = bool(check.all())
+            if not check:
+                # NOTE: does not consider permuting values, which we may want to consider...
+                return False
+        return True
 
 class TransferData0:
     source: atomspack1
@@ -140,6 +159,17 @@ class TransferData0:
             source,
             target,
             domain_overlaps_edge_index)
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value,TransferData0):
+            return False
+        for key in vars(self):
+            check: bool|Tensor = getattr(self,key) == getattr(value,key)
+            if isinstance(check,Tensor):
+                check = bool(check.all())
+            if not check:
+                # NOTE: does not consider permuting values, which we may want to consider...
+                return False
+        return True
 
 class TransferData1(TransferData0):
     node_map_edge_index: Tensor
@@ -168,7 +198,7 @@ class TransferData1(TransferData0):
         self.node_map_edge_index = self.node_map_edge_index.to(device)
         self.intersect_indicator = self.intersect_indicator.to(device)
 
-    def copy(self) -> "TransferData1":
+    def copy(self) -> TransferData1:
         return TransferData1(**self.__dict__)
     
     def reverse(self, in_place: bool = False) -> TransferData1:

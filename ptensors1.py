@@ -13,6 +13,8 @@ from objects1 import TransferData1, atomspack1
 from objects2 import atomspack2
 
 def linmaps0_1(x: Tensor, domains:  atomspack1):
+    # print("x.size()",x.size())
+    # print("domains.domain_indicator.size()",domains.domain_indicator.size())
     return x[domains.domain_indicator]
 
 def linmaps1_0(x: Tensor, domains: atomspack1, reduce: str='sum'):

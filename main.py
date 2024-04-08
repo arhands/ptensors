@@ -30,6 +30,7 @@ parser.add_argument('--include_cycle2cycle',action='store_true')
 parser.add_argument('--optimizer',type=str,default='adam')
 parser.add_argument('--num_trials',type=int,default=10)
 parser.add_argument('--max_cycle_size',type=int,default=None)
+parser.add_argument('--seed',type=int,default=None)
 parser.add_argument('--enable_model_summary',action="store_true")
 parser.add_argument('--show_epoch_progress_bar',action="store_true")
 
@@ -43,23 +44,25 @@ args = parser.parse_args()
 
 
 from torch.cuda import is_available
-from utils import get_run_path
+from utils import get_run_path, ensure_exists
 from model_handler import ModelHandler, get_mode
-from data_handler import dataset_type, _tu_datasets, ZINCDatasetHandler, DataHandler, OGBGDatasetHandler, TUDatasetHandler
+from data_handler import dataset_type, _tu_datasets, ZINCDatasetHandler, OGBGDatasetHandler, TUDatasetHandler
 from train_handler import get_trainer
 from model import Net
-import os
 from data_transforms import AddNodes, AddEdges, AddChordlessCycles, AddTransferMap, GeneratePtensObject
+import torch_geometric
+if args.seed is not None:
+    torch_geometric.seed_everything(args.seed)
 
 # TODO: come up for better solution for this.
-import warnings
-import logging
-warnings.filterwarnings("ignore", ".*does not have many workers.*")
-warnings.filterwarnings("ignore", ".*Set a lower value for log_every_n_steps if you want to see logs for the training epoch.*")
-warnings.filterwarnings("ignore", ".*PU available:.*",module="lightning.pytorch")
-warnings.filterwarnings("ignore", ".*is an invalid version and will not be supported in a future release*",module="pkg_resources/__init__")
+# import warnings
+# import logging
+# warnings.filterwarnings("ignore", ".*does not have many workers.*")
+# warnings.filterwarnings("ignore", ".*Set a lower value for log_every_n_steps if you want to see logs for the training epoch.*")
+# warnings.filterwarnings("ignore", ".*PU available:.*",module="lightning.pytorch")
+# warnings.filterwarnings("ignore", ".*is an invalid version and will not be supported in a future release*",module="pkg_resources/__init__")
 
-logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
+# logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
 
 device: str
 if args.device is None:
@@ -82,12 +85,6 @@ pre_transform = GeneratePtensObject(
     ],
     transfer_maps
 )
-def ensure_exists(path: str):
-    base = ''
-    for segment in path.split('/'):
-        base = f'{base}{segment}/'
-        if not os.path.exists(base):
-            os.mkdir(base)
 
 def get_arg_combinations(keys: list[str]) -> list[dict[str,str]]:
     if len (keys) == 0:

@@ -87,6 +87,10 @@ class PtensObjects:
       for key2 in tf:
         data.set_transfer_maps(*key2,tf[key2])#type: ignore
     # return data
+    dupe = self.from_fancy_data(data)
+    for c in [self.tf0,self.tf1,self.tf2,self.ap1,self.ap2]:
+      for k in c:
+        assert dupe[k] == self[k], f"key = {k}:\n{dupe[k]} !=\n{self[k]}"
   @classmethod
   def from_fancy_data(cls, data: FancyDataObject) -> PtensObjects:
     return cls(*data.get_ptens_params())

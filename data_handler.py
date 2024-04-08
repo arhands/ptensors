@@ -73,8 +73,8 @@ class DataHandler(pl.LightningDataModule):
     def val_dataloader(self):
         return self._get_dataloader('val')
     # def on_after_batch_transfer(self, batch: FancyDataObject, dataloader_idx: int) -> tuple[Tensor, Tensor, Tensor,int, PtensObjects]:
-    def on_after_batch_transfer(self, batch: FancyDataObject, dataloader_idx: int) -> tuple[Tensor, Tensor, Tensor, PtensObjects]:
-        return batch.x, batch.edge_attr, batch.y, PtensObjects.from_fancy_data(batch)
+    def on_after_batch_transfer(self, batch: FancyDataObject, dataloader_idx: int) -> tuple[FancyDataObject, PtensObjects]:
+        return batch, PtensObjects.from_fancy_data(batch)
         # return batch.x, batch.edge_attr, batch.y, batch.num_graphs, PtensObjects.from_fancy_data(batch)
 
 #################################################################################################################################

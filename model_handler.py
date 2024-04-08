@@ -4,7 +4,7 @@ from pytorch_optimizer.base.types import OPTIMIZER, PARAMETERS
 from torch.nn import Module
 from torch import Tensor
 import torch
-from data import PtensObjects
+from data import FancyDataObject, PtensObjects
 from torchmetrics import MeanAbsoluteError, MeanSquaredError
 from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy
 from torch.nn import L1Loss, BCEWithLogitsLoss, MSELoss, CrossEntropyLoss
@@ -96,16 +96,12 @@ class ModelHandler(pl.LightningModule):
         self.ds : dataset_type = ds
         self.optimizer_name : Literal['adam','asam'] = optimizer
 
-    def forward(self, x: Tensor, edge_attr: Tensor, data: PtensObjects) -> Tensor:#type: ignore
-        return self.model(x,edge_attr,data)
+    def forward(self, batch: FancyDataObject, ptens_obj: PtensObjects) -> Tensor:#type: ignore
+        return self.model(batch,ptens_obj)
     
-    def training_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
-        x: Tensor
-        edge_attr: Tensor
-        y: Tensor
-        data: PtensObjects
-        x, edge_attr, y, data = batch
-        pred = self(x,edge_attr,data)
+    def training_step(self, batch: tuple[FancyDataObject,PtensObjects], batch_idx: int):#type: ignore
+        pred = self(*batch)
+        y = batch[0].y
         if self.ds == 'ogbg-moltox21':
             mask = ~torch.isnan(y)
             pred = pred[mask]
@@ -116,20 +112,10 @@ class ModelHandler(pl.LightningModule):
         self.log('train_score',self.train_score_fn,True,batch_size=len(y),on_step=False,on_epoch=True)
 
         return loss
-    def validation_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
-        x: Tensor
-        edge_attr: Tensor
-        y: Tensor
-        data: PtensObjects
-        x, edge_attr, y, data = batch
-        self.valid_score_fn(self(x,edge_attr,data),y)
+    def validation_step(self, batch: tuple[FancyDataObject,PtensObjects], batch_idx: int):#type: ignore
+        self.valid_score_fn(self(*batch),batch[0].y)
     def test_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
-        x: Tensor
-        edge_attr: Tensor
-        y: Tensor
-        data: PtensObjects
-        x, edge_attr, y, data = batch
-        self.test_score_fn(self(x,edge_attr,data),y)
+        self.test_score_fn(self(*batch),batch[0].y)
     def on_validation_epoch_end(self) -> None:
         self.log('lr-Adam',self.optimizers(False).param_groups[0]['lr'])#type: ignore
         self.log('val_score',self.valid_score_fn,on_epoch=True,prog_bar=True)

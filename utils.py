@@ -14,3 +14,9 @@ def get_run_path(base_dir: str = 'logs') -> str:
     if not os.path.exists(run_path):
         os.mkdir(run_path)
     return run_path
+def ensure_exists(path: str):
+    base = ''
+    for segment in path.split('/'):
+        base = f'{base}{segment}/'
+        if not os.path.exists(base):
+            os.mkdir(base)
