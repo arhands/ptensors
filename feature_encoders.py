@@ -9,29 +9,14 @@ from data_handler import dataset_type
 from objects1 import TransferData1
 from ptensors1 import transfer0_1
 
-class DummyEdgeEncoder(Module):
-    r"""
-    Equivalent to torch.nn.Embedding with default options.
-    """
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        w = torch.normal(0,1,[1,hidden_dim])
-        self.weight = torch.nn.Parameter(w,requires_grad=True)
-    def forward(self, x: Tensor) -> Tensor:
-        return self.weight.broadcast_to(x.size(0),-1)
-
-
 class DummyNodeEncoder(Module):
     r"""
     Equivalent to torch.nn.Embedding with default options.
     """
     def __init__(self, hidden_dim: int) -> None:
         super().__init__()
-        # w = torch.normal(0,1,[1,hidden_dim])
-        # self.weight = torch.nn.Parameter(w,requires_grad=True)
         self.weight = Embedding(1,hidden_dim)
     def forward(self, x: Tensor) -> Tensor:
-        # return self.weight.broadcast_to(x.size(0),-1)
         return self.weight(torch.zeros_like(x,dtype=torch.int32))
 
 def get_tu_node_encoder(deg_count: int, hidden_dim: int):
@@ -52,42 +37,8 @@ def get_edge_encoder(hidden_dim: int, name: Literal['Embedding','BondEncoder','E
             'Embedding' : lambda: Embedding(feature_count,hidden_dim),
             'EmbeddingBag' : lambda: EmbeddingBag(feature_count,hidden_dim),
         }[name]()
-def get_edge_encoder_old(hidden_dim: int,ds: dataset_type) -> Union[BondEncoder,Embedding,DummyEdgeEncoder]:
-    return {
-        'ZINC'              : Embedding(4,hidden_dim)       ,
-        'ZINC-Full'         : Embedding(4,hidden_dim)       ,
-        
-        # OGB/molecular
-        'ogbg-molhiv'       : BondEncoder(hidden_dim)       ,
-        'ogbg-moltox21'     : BondEncoder(hidden_dim)       ,
-        'peptides-struct'   : BondEncoder(hidden_dim)       ,
 
-        # synthetic
-        'graphproperty'     : DummyEdgeEncoder(hidden_dim)  ,
 
-        # TUDatasets
-        'MUTAG'             : get_tu_edge_encoder(4,hidden_dim)       ,
-        'ENZYMES'           : get_tu_edge_encoder(10,hidden_dim)  ,
-        'PROTEINS'          : get_tu_edge_encoder(26,hidden_dim)  ,
-        #'COLLAB'            : DummyEdgeEncoder(hidden_dim)  ,
-        'IMDB-MULTI'        : get_tu_edge_encoder(89,hidden_dim)  ,
-        'IMDB-BINARY'       : get_tu_edge_encoder(136,hidden_dim)  ,
-        'REDDIT-BINARY'     : get_tu_edge_encoder(1,hidden_dim)   ,
-        'NCI1'              : get_tu_edge_encoder(5,hidden_dim)  ,
-        'NCI109'            : get_tu_edge_encoder(6,hidden_dim)  ,
-        'PTC_MR'            : get_tu_edge_encoder(4,hidden_dim) ,
-    }[ds]
-
-class GraphPropertyNodeEncoder(Module):
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        self.emb = Embedding(2,hidden_dim-1)
-    
-    def forward(self, x: Tensor) -> Tensor:
-        return torch.cat([
-            self.emb(x[:,0].int()),
-            x[:,1].unsqueeze(-1)
-        ],-1)
 @overload
 def get_node_encoder(hidden_dim: int, name: Literal['AtomEncoder'], num_features: Literal[None] = None) -> Module:...
 @overload
@@ -98,53 +49,11 @@ def get_node_encoder(hidden_dim: int, name: Literal['Embedding','AtomEncoder'], 
     else:
         num_features = cast(int,num_features)
         return Embedding(num_features,hidden_dim)
-def get_node_encoder_old(hidden_dim: int,ds: dataset_type) -> Union[AtomEncoder,Embedding,GraphPropertyNodeEncoder]:
-    return {
-        'ZINC'              : Embedding(28,hidden_dim)              ,
-        'ZINC-Full'         : Embedding(28,hidden_dim)              ,
 
-        # OGB/Molecular
-        'ogbg-molhiv'       : AtomEncoder(hidden_dim)               ,
-        'ogbg-moltox21'     : AtomEncoder(hidden_dim)               ,
-        'peptides-struct'   : AtomEncoder(hidden_dim)               ,
-
-        # synthetic
-        'graphproperty'     : GraphPropertyNodeEncoder(hidden_dim)  ,
-
-        # TUDatasets
-        'MUTAG'             : Embedding( 7,hidden_dim),
-        'ENZYMES'           : Embedding( 3,hidden_dim)              ,
-        'PROTEINS'          : Embedding( 3,hidden_dim)              ,
-        # 'COLLAB'            : get_tu_node_encoder(hidden_dim)          ,
-        'IMDB-MULTI'        : get_tu_node_encoder(89,hidden_dim)          ,
-        'IMDB-BINARY'       : get_tu_node_encoder(136,hidden_dim)          ,
-        'REDDIT-BINARY'     : get_tu_node_encoder(1,hidden_dim)       ,
-        'NCI1'              : Embedding(37,hidden_dim)              ,
-        'NCI109'            : Embedding(38,hidden_dim)              ,
-        'PTC_MR'            : Embedding(18,hidden_dim)              ,
-    }[ds]
-    
-
-
-# class AffineSum(Module):
-#     def __init__(self, epsilon : float =0.5) -> None:
-#         super().__init__()
-#         self.epsilon = Parameter(torch.tensor(epsilon,requires_grad=True))
-#     def forward(self, x: Tensor, y: Tensor):
-#         return self.epsilon * x + (1 - self.epsilon) * y
-
-class CycleEmbedding0(Module):
-    def __init__(self, hidden_dim: int, ds: dataset_type) -> None:
+class CycleEmbedding(Module):
+    def __init__(self, hidden_dim: int, node_emb: Module) -> None:
         super().__init__()
-        self.emb = get_node_encoder_old(hidden_dim,ds)
-    def forward(self, x: Tensor, atom_to_cycle: Tensor):
-        x = self.emb(x)
-        return scatter_sum(x[atom_to_cycle[0]],atom_to_cycle[1],0)
-
-class CycleEmbedding1(Module):
-    def __init__(self, hidden_dim: int, ds: dataset_type) -> None:
-        super().__init__()
-        self.emb = get_node_encoder_old(hidden_dim,ds)
+        self.emb = node_emb
         self.epsilon = Parameter(torch.tensor(0.,requires_grad=True))
     def forward(self, x: Tensor, node2cycle: TransferData1) -> Tensor:
         x = self.emb(x)

@@ -1,100 +1,110 @@
-from typing import Callable, Literal
+from __future__ import annotations
+from typing import Callable, Literal, cast, overload
+from git import Optional
 import lightning.pytorch as pl
 from pytorch_optimizer.base.types import OPTIMIZER, PARAMETERS
 from torch.nn import Module
 from torch import Tensor
 import torch
 from data import FancyDataObject, PtensObjects
-from torchmetrics import MeanAbsoluteError, MeanSquaredError
-from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy
+from torchmetrics import MeanAbsoluteError, MeanSquaredError, Metric
+from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy, MultilabelAccuracy
 from torch.nn import L1Loss, BCEWithLogitsLoss, MSELoss, CrossEntropyLoss
 from torch.optim import Adam, Optimizer
 from pytorch_optimizer.optimizer.sam import SAM
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
-from data_handler import dataset_type, _tu_datasets
+from data_handler import DataHandler, dataset_type, tu_dataset_type_list
+from torch_geometric.data import InMemoryDataset
+from argparse import Namespace
+from feature_encoders import get_edge_encoder, get_node_encoder, CycleEmbedding
+from model import Net
 
-class Log10MSE(MeanSquaredError):
-    def compute(self) -> Tensor:
-        return super().compute().log10()
+loss_arg_type_list = ['MAE','BCEWithLogits','MSE','CrossEntropy']
+loss_arg_type = Literal['MAE','BCEWithLogits','MSE','CrossEntropy']
+def get_loss_fn(name: loss_arg_type) -> Module:
+    return {
+        'MAE' : L1Loss,
+        'BCEWithLogits' : BCEWithLogitsLoss,
+        'MSE' : MeanSquaredError,
+        'CrossEntropy' : CrossEntropyLoss,
+    }[name]()
 
-def get_mode(ds: dataset_type) -> Literal['min','max']:
-    if ds in ['ZINC','ZINC-Full','peptides-struct']:
-        return 'min'
+score_arg_type_list = ['MAE','AUROC','Accuracy','Multi-Label-Accuracy']
+score_arg_type = Literal['MAE','AUROC','Accuracy','Multi-Label-Accuracy']
+@overload
+def get_score_fn(name: Literal['Accuracy','Multi-Label-Accuracy'], num_args: int) -> Metric:...
+@overload
+def get_score_fn(name: Literal['Accuracy'], num_args: Literal[None] = None) -> BinaryAccuracy:...
+@overload
+def get_score_fn(name: Literal['MAE','AUROC'], num_args: Literal[None] = None) -> Metric:...
+def get_score_fn(name: score_arg_type, num_args: Optional[int] = None) -> Metric:
+    if name == 'Accuracy':
+        if num_args is None or num_args == 2:
+            return BinaryAccuracy()
+        else:
+            assert num_args > 2
+            return MulticlassAccuracy(num_args,average='micro')
+    elif name == 'Multi-Label-Accuracy':
+        num_args = cast(int,num_args)
+        assert num_args > 1
+        return MultilabelAccuracy(num_args,average='micro')
     else:
-        return 'max'
-
-def get_loss_fn(ds: dataset_type):
-    if ds in ['ZINC','peptides-struct']:
-        return L1Loss()
-    elif ds in ['ogbg-molhiv','ogbg-moltox21','MUTAG','PROTEINS','IMDB-BINARY','REDDIT-BINARY','NCI1','NCI109','PTC_MR']:
-        return BCEWithLogitsLoss()
-    elif ds == 'graphproperty':
-        return MSELoss()
-    elif ds in ['ENZYMES','COLLAB','IMDB-MULTI']:
-        return CrossEntropyLoss()
-    else:
-        raise NotImplementedError(f'Not implemented for dataset \"{ds}\".')
-
-def get_score_fn(ds: dataset_type):
-    if ds in ['ZINC','peptides-struct']:
-        return MeanAbsoluteError()
-    elif ds in ['ogbg-molhiv','ogbg-moltox21']:
-        return BinaryAUROC()
-    elif ds == 'graphproperty':
-        return Log10MSE()
-    elif ds in ['MUTAG','PROTEINS','IMDB-BINARY','REDDIT-BINARY','NCI1','NCI109','PTC_MR']:
-        return BinaryAccuracy()
-    elif ds == 'ENZYMES':
-        return MulticlassAccuracy(6,average='micro')
-    elif ds in ['COLLAB','IMDB-MULTI']:
-        return MulticlassAccuracy(3,average='micro')
-    else:
-        raise NotImplementedError(f'Not implemented for dataset \"{ds}\".')
-
-def get_lr_scheduler(ds: dataset_type, optimizer: Optimizer, **args):
-    if ds in ['ZINC','ZINC-Full','peptides-struct']:
         return {
-            "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],args['lr_decay'],args['lr_patience'],cooldown=args['cooldown'],verbose=True),
-            "monitor" : "val_score"
-        }
-    elif ds in _tu_datasets:
-        return StepLR(optimizer,50,0.5)
-    elif ds in ['ogbg-molhiv','ogbg-moltox21']:
-        return None
-    elif ds == 'graphproperty':
-        return StepLR(optimizer,args['lr_step_size'],args['lr_decay'])
-    else:
-        raise NotImplementedError(f'Not implemented for dataset \"{ds}\".')
+            'MAE' : MeanAbsoluteError,
+            'AUROC' : BinaryAUROC,
+        }[name]()
 
+lr_scheduler_arg_type_list = ['ReduceLROnPlateau','StepLR']
+lr_scheduler_arg_type = Literal['ReduceLROnPlateau','StepLR']
+@overload
+def get_lr_scheduler(sched: Literal[None], optimizer: Optimizer, **args) -> None:...
+@overload
+def get_lr_scheduler(sched: lr_scheduler_arg_type, optimizer: Optimizer, **args) -> Optimizer:...
+def get_lr_scheduler(sched: lr_scheduler_arg_type|None, optimizer: Optimizer, **args) -> Optimizer|None:
+    return {
+        'ReduceLROnPlateau' : lambda : {
+                "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],0.5,args['patience'],verbose=True),
+                "monitor" : "val_score"
+            },
+        'StepLR' : StepLR(optimizer,50,0.5),
+        None : lambda : None,
+    }[sched]()
 
 class ASAM(SAM):
     def __init__(self, params: PARAMETERS, base_optimizer: OPTIMIZER, rho: float = 0.05, **kwargs):
         super().__init__(params, base_optimizer, rho, True, **kwargs)
     
     def step(self, closure: Callable[[],Tensor]):#type: ignore
-        # def wrapped_closure():
-        #     loss : Tensor = closure()
-        #     loss.backward()
-        #     return loss
         value = closure()
         super().step(closure)#type: ignore
         return value
 
 
 class ModelHandler(pl.LightningModule):
-    def __init__(self, model: Module, lr: float, ds: dataset_type, optimizer: Literal['adam','asam'], **lr_schedular_args) -> None:
+    def __init__(self, model: Module, args: Namespace, num_classes: Optional[int]) -> None:
         super().__init__()
-        # self.save_hyperparameters()
+        # self.save_hyperparameters(args,ignore=[
+        #     'enable_model_summary',
+        #     'show_epoch_progress_bar',
+        #     'device',
+        #     'eval_batch_size',
+        #     'task_type',
+        # ])
         self.model = model
-        self.loss_fn = get_loss_fn(ds)
-        self.train_score_fn = get_score_fn(ds)
-        self.valid_score_fn = get_score_fn(ds)
-        self.test_score_fn = get_score_fn(ds)
-        self.lr = lr
+        self.loss_fn = get_loss_fn(args.loss)
+        self.train_score_fn = get_score_fn(args.eval_metric,num_classes)
+        self.valid_score_fn = get_score_fn(args.eval_metric,num_classes)
+        self.test_score_fn = get_score_fn(args.eval_metric,num_classes)
+        self.lr = args.lr
 
-        self.lr_scheduler_args = lr_schedular_args
-        self.ds : dataset_type = ds
-        self.optimizer_name : Literal['adam','asam'] = optimizer
+        self.lr_scheduler_args = {
+            "mode" : args.mode,
+            "patience" : args.patience,
+            "scheduler" : args.lr_scheduler,
+            
+        }
+        self.ds : dataset_type = args.dataset
+        self.optimizer_name : Literal['adam','asam'] = args.optimizer
 
     def forward(self, batch: FancyDataObject, ptens_obj: PtensObjects) -> Tensor:#type: ignore
         return self.model(batch,ptens_obj)
@@ -114,7 +124,7 @@ class ModelHandler(pl.LightningModule):
         return loss
     def validation_step(self, batch: tuple[FancyDataObject,PtensObjects], batch_idx: int):#type: ignore
         self.valid_score_fn(self(*batch),batch[0].y)
-    def test_step(self, batch: tuple[Tensor,Tensor,Tensor,PtensObjects], batch_idx: int):#type: ignore
+    def test_step(self, batch: tuple[FancyDataObject,PtensObjects], batch_idx: int):#type: ignore
         self.test_score_fn(self(*batch),batch[0].y)
     def on_validation_epoch_end(self) -> None:
         self.log('lr-Adam',self.optimizers(False).param_groups[0]['lr'])#type: ignore
@@ -129,7 +139,7 @@ class ModelHandler(pl.LightningModule):
             optimizer = ASAM(self.model.parameters(),Adam,lr=self.lr)
         else:
             raise NotImplementedError(f'Optimizer \"{self.optimizer_name}\" not handled.')
-        scheduler = get_lr_scheduler(self.ds,optimizer,**self.lr_scheduler_args)
+        scheduler = get_lr_scheduler(self.lr_scheduler_args["scheduler"],optimizer,**self.lr_scheduler_args)#type: ignore
         if scheduler is None:
             return optimizer
         else:
@@ -137,3 +147,8 @@ class ModelHandler(pl.LightningModule):
                 "optimizer" : optimizer,
                 "lr_scheduler" : scheduler 
             }
+    @classmethod
+    def from_in_memory_ds(cls, ds: InMemoryDataset, args: Namespace) -> ModelHandler:
+        output_dim: int = 1 if args.task_type == 'single-target-regression' else ds.y.unique().item() + 1
+        net: Net = Net.from_in_memory_ds(ds,output_dim,args)
+        return cls(net,args,output_dim)
