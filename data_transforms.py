@@ -11,10 +11,11 @@ from objects2 import atomspack2, TransferData2
 import networkx as nx
 
 class GeneratePtensObject(BaseTransform):
-  def __init__(self, atomspacks: list[AddAtomspack], transfers: list[AddTransferMap]) -> None:
+  def __init__(self, atomspacks: list[AddAtomspack], transfers: list[AddTransferMap], return_ptens_obj: bool = False) -> None:
     super().__init__()
     self.atomspacks: list[AddAtomspack] = atomspacks
     self.transfers: list[AddTransferMap] = transfers
+    self.return_ptens_obj = return_ptens_obj
   def __call__(self, data: Data) -> FancyDataObject:
     data2 = FancyDataObject()
     data2.__dict__.update(data.__dict__)
@@ -26,6 +27,8 @@ class GeneratePtensObject(BaseTransform):
     ptobj.export_to_data(data2)
     # TODO: make sure I can actually do what the below line is doing.
     data2.edge_index = None#type: ignore
+    if self.return_ptens_obj:
+      return data2, ptobj
     return data2
 
 class AddAtomspack:

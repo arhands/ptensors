@@ -67,6 +67,7 @@ wandb.define_metric("test_score",summary=mode)
 data_handler: DataHandler = get_data_handler(pre_transform,args)
 data_handler.setup('fit')
 model: ModelHandler = ModelHandler.from_in_memory_ds(data_handler.splits['train'],args)
-trainer = get_trainer(run_path,args.num_epochs,args.min_lr,mode,logger,args.enable_model_summary,args.hide_epoch_progress_bar)
+trainer = get_trainer(run_path,args.num_epochs,args.min_lr,mode,logger,args.show_epoch_progress_bar,args.enable_model_summary)
 trainer.fit(model,datamodule=data_handler)
 trainer.test(model,ckpt_path='best',datamodule=data_handler)
+

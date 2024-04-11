@@ -149,6 +149,8 @@ class ModelHandler(pl.LightningModule):
             }
     @classmethod
     def from_in_memory_ds(cls, ds: InMemoryDataset, args: Namespace) -> ModelHandler:
-        output_dim: int = 1 if args.task_type == 'single-target-regression' else ds.y.unique().item() + 1
+        output_dim: int = 1 if args.task_type == 'single-target-regression' else int(ds.y.max().item()) + 1
+        if output_dim == 2:
+            output_dim = 1#we assume if there are only two classes, that it is binary classification.
         net: Net = Net.from_in_memory_ds(ds,output_dim,args)
         return cls(net,args,output_dim)

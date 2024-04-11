@@ -187,9 +187,11 @@ class TransferData1(TransferData0):
     """
     num_nodes: int
     """The number of nodes in the original graph."""
-    def __init__(self,source,target,domain_map_edge_index,node_map_edge_index,num_nodes,intersect_indicator):
+    def __init__(self,source: atomspack1,target: atomspack1,domain_map_edge_index,node_map_edge_index,num_nodes: int|None,intersect_indicator):
         super().__init__(source,target,domain_map_edge_index)
         self.node_map_edge_index = node_map_edge_index
+        if num_nodes is None:
+            num_nodes = int(max(source.atoms.max().item(),target.atoms.max().item()) + 1)
         self.num_nodes = num_nodes
         self.intersect_indicator = intersect_indicator
     

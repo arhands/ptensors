@@ -8,7 +8,7 @@ def get_args() -> Namespace:
 
   # general environment arguments
   parser.add_argument('--enable_model_summary',action="store_true")
-  parser.add_argument('--hide_epoch_progress_bar',action="store_false")
+  parser.add_argument('--show_epoch_progress_bar',type=bool,default=True)
   parser.add_argument('--device',type=str,default=None)
   parser.add_argument('--eval_batch_size',type=int,default=512)
 
@@ -28,8 +28,8 @@ def get_args() -> Namespace:
   parser.add_argument('--task_type',choices=['classification','single-target-regression'],required=True)
   parser.add_argument('--mode',choices=['min','max'],required=True)
   ## scheduler
-  parser.add_argument('--lr_scheduler',choices=lr_scheduler_arg_type_list,required=True)
-  parser.add_argument('--patience',type=int, required=True,
+  parser.add_argument('--lr_scheduler',choices=lr_scheduler_arg_type_list,default=None)
+  parser.add_argument('--patience',type=int,
                       help='For Reduce LR on plateau, it is patience, and for StepLR, it is the time between steps.')
   parser.add_argument('--min_lr',type=float,default=None)
 
@@ -50,6 +50,6 @@ def get_args() -> Namespace:
   # validating 
   if args.dataset in tu_dataset_type_list:
     assert args.num_folds is not None, "The number of folds must be specified for TUDatasets."
-  if args.lr_scheduler == 'ReduceLROnPlateau':
+  if args.lr_scheduler is not None and args.lr_scheduler == 'ReduceLROnPlateau':
     assert args.min_lr is not None, "min_lr must be specified for ReduceLROnPlateau."
   return args

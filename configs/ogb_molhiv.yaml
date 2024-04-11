@@ -1,0 +1,43 @@
+program: main.py
+name: ogb-molhiv
+method: grid
+metric:
+  goal: maximize
+  name: val_score
+parameters:
+  num_layers:
+    value: 2
+  dataset:
+    value: "ogbg-molhiv"
+  mode:
+    value: "max"
+  eval_metric:
+    value: "AUROC"
+  loss:
+    value: "BCEWithLogits"
+  lr:
+    value: 0.0001
+  batch_size:
+    value: 256
+  seed: 
+    values: [1,2,3,4,5,6,7,8,9,10]
+  bn_momentum:
+    value: 0.1
+  num_epochs:
+    value: 150
+  task_type:
+    value: "classification"
+  optimizer: 
+    value: "asam"
+  hidden_channels: 
+    value: 64
+  feature_encoder:
+    value: "OGB"
+  readout:
+    value: "mean"
+  dropout:
+    value: 0.5
+  max_cycle_size:
+    value: 6
+  show_epoch_progress_bar:
+    value: true

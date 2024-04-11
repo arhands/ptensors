@@ -179,9 +179,9 @@ def get_data_handler(pre_transform, args: Namespace) -> DataHandler:
         data_handler = ZINCDatasetHandler(subset = ds_name != 'ZINC-Full',**handlerArgs)
         dataset = 'ZINC'
     elif ds_name in ['ogbg-molhiv','ogbg-moltox21']:
-        data_handler = OGBGDatasetHandler(ds_name=dataset,**handlerArgs)#type: ignore
+        data_handler = OGBGDatasetHandler(ds_name=ds_name,**handlerArgs)#type: ignore
     elif ds_name in _tu_datasets:
-        data_handler = TUDatasetHandler(ds_name=dataset,num_folds=args.num_trials,seed=0,**handlerArgs)#type: ignore
+        data_handler = TUDatasetHandler(ds_name=ds_name,num_folds=args.num_trials,seed=0,**handlerArgs)#type: ignore
     else:
         raise NotImplementedError(ds_name)
     return data_handler

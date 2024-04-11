@@ -86,7 +86,7 @@ class PtensObjects:
       key2:tuple[str,str]
       for key2 in tf:
         data.set_transfer_maps(*key2,tf[key2])#type: ignore
-    # return data
+    return data
     dupe = self.from_fancy_data(data)
     for c in [self.tf0,self.tf1,self.tf2,self.ap1,self.ap2]:
       for k in c:
@@ -254,7 +254,6 @@ class FancyDataObject(Data):
         setattr(self,f"{prefix}__{k}__{key}",dictionary[k])
         # assert hasattr(self,f"{prefix}__{k}__{key}")
   def get_ptens_params(self) -> tuple[dict[str, atomspack1], dict[str, atomspack2], dict[tuple[str, str], TransferData0], dict[tuple[str, str], TransferData1], dict[tuple[str, str], TransferData2]]:
-    # dictionary = vars(self)
     args: dict[str,Any] = dict()
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
@@ -283,8 +282,8 @@ class FancyDataObject(Data):
     def tf_to_ap2(source: str, dest: str) -> tuple[atomspack2, atomspack2]:
       return ap2[source], ap2[dest]
     tf0: dict[tuple[str,str],TransferData0] = {(source,dest): TransferData0(*tf_to_ap(source,dest),**args[key]) for source,dest,key in transfer_objects[0]}
-    tf1: dict[tuple[str,str],TransferData1] = {(source,dest): TransferData1(*tf_to_ap(source,dest),num_nodes=self.num_nodes,**args[key]) for source,dest,key in transfer_objects[1]}
-    tf2: dict[tuple[str,str],TransferData2] = {(source,dest): TransferData2(*tf_to_ap2(source,dest),num_nodes=self.num_nodes,**args[key]) for source,dest,key in transfer_objects[2]}
+    tf1: dict[tuple[str,str],TransferData1] = {(source,dest): TransferData1(*tf_to_ap(source,dest),num_nodes=None,**args[key]) for source,dest,key in transfer_objects[1]}
+    tf2: dict[tuple[str,str],TransferData2] = {(source,dest): TransferData2(*tf_to_ap2(source,dest),num_nodes=None,**args[key]) for source,dest,key in transfer_objects[2]}
     return ap1, ap2, tf0, tf1, tf2
   def set_atomspack(self, ap1: atomspack1|atomspack2, key: str) -> None:
     self._set_ptens_param(key,ap1,['_atoms2','_domains_indicator2','raw_num_domains'])
