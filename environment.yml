@@ -1,4 +1,4 @@
-name: ptensors2
+name: ptensors
 channels:
   - defaults
   - pytorch
@@ -6,15 +6,16 @@ channels:
   - pyg
   - conda-forge
 dependencies:
-  - lightning==2.2.2
-  - ogb==1.3.6
-  - pyg
+  - pip==24.0
+  - conda-forge::lightning==2.2.2
+  - conda-forge::ogb==1.3.6
+  - pyg::pyg
   - python=3.10
-  - pytorch-cuda=11.7
-  - pytorch-scatter
-  - pytorch==2.0.1
-  - torchaudio==2.0.2
-  - torchvision==0.15.2
+  - pytorch::pytorch-cuda=11.7
+  - conda-forge::pytorch-scatter
+  - pytorch::pytorch==2.0.1
+  - pytorch::torchaudio==2.0.2
+  - pytorch::torchvision==0.15.2
   - wandb==0.16.5
   - pip:
     - pytorch-optimizer==2.12.0
