@@ -1,0 +1,21 @@
+name: ptensors2
+channels:
+  - defaults
+  - pytorch
+  - nvidia
+  - pyg
+  - conda-forge
+dependencies:
+  - lightning==2.2.2
+  - ogb==1.3.6
+  - pyg
+  - python=3.10
+  - pytorch-cuda=11.7
+  - pytorch-scatter
+  - pytorch==2.0.1
+  - torchaudio==2.0.2
+  - torchvision==0.15.2
+  - wandb==0.16.5
+  - pip:
+    - pytorch-optimizer==2.12.0
+prefix: /home/andrew/anaconda3/envs/ptensors
