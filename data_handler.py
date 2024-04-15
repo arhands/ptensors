@@ -178,11 +178,13 @@ def get_data_handler(pre_transform, args: Namespace) -> DataHandler:
     }
     if ds_name in ['ZINC','ZINC-Full']:
         data_handler = ZINCDatasetHandler(subset = ds_name != 'ZINC-Full',**handlerArgs)
-        dataset = 'ZINC'
+        # dataset = 'ZINC'
     elif ds_name in ['ogbg-molhiv','ogbg-moltox21']:
         data_handler = OGBGDatasetHandler(ds_name=ds_name,**handlerArgs)#type: ignore
     elif ds_name in _tu_datasets:
-        data_handler = TUDatasetHandler(ds_name=ds_name,num_folds=args.num_trials,seed=0,**handlerArgs)#type: ignore
+        data_handler = TUDatasetHandler(ds_name=ds_name,num_folds=args.num_folds,seed=0,**handlerArgs)#type: ignore
+        # NOTE: we assume here that the seeds will be given as [1,...,args.num_folds]
+        data_handler.set_fold_idx(args.seed - 1)
     else:
         raise NotImplementedError(ds_name)
     return data_handler
