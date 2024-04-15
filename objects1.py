@@ -2,6 +2,7 @@
 objects used for zeroth and first order interactions.
 """
 from __future__ import annotations
+from typing import cast
 import torch
 from torch import Tensor
 from torch_geometric.data import Data
@@ -233,14 +234,14 @@ class TransferData1(TransferData0):
         #     mask_intersect_domains = overlap_size_source == source_size[domain_overlaps_edge_index[0]]
         #     mask_intersect_nodes = mask_intersect_domains[intersect_indicator]
 
-
+        num_nodes: int
         if source.num_domains > 0:
-            num_nodes = source.atoms.max().item()
+            num_nodes = cast(int,source.atoms.max().item())
         else:
             num_nodes = 0
 
         if target.num_domains > 0:
-            num_nodes = max(num_nodes,target.atoms.max().item())
+            num_nodes = cast(int,max(num_nodes,target.atoms.max().item()))
         
         num_nodes += 1
 

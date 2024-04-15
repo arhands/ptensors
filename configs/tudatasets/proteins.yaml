@@ -23,8 +23,6 @@ parameters:
     value: 0.1
   num_epochs:
     value: 350
-  task_type:
-    value: "classification"
   optimizer: 
     value: "adam"
   lr_scheduler:

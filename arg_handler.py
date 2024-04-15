@@ -25,7 +25,6 @@ def get_args() -> Namespace:
   parser.add_argument('--feature_encoder',choices=['OGB','Embedding'],required=True)
 
   # training/evaluation arguments
-  parser.add_argument('--task_type',choices=['classification','single-target-regression'],required=True)
   parser.add_argument('--mode',choices=['min','max'],required=True)
   ## scheduler
   parser.add_argument('--lr_scheduler',choices=lr_scheduler_arg_type_list,default=None)

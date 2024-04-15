@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Literal, cast, overload
-from git import Optional
+from typing import Callable, Literal, cast, overload, Optional
 import lightning.pytorch as pl
 from pytorch_optimizer.base.types import OPTIMIZER, PARAMETERS
 from torch.nn import Module
@@ -148,9 +147,18 @@ class ModelHandler(pl.LightningModule):
                 "lr_scheduler" : scheduler 
             }
     @classmethod
-    def from_in_memory_ds(cls, ds: InMemoryDataset, args: Namespace) -> ModelHandler:
-        output_dim: int = 1 if args.task_type == 'single-target-regression' else int(ds.y.max().item()) + 1
-        if output_dim == 2:
-            output_dim = 1#we assume if there are only two classes, that it is binary classification.
-        net: Net = Net.from_in_memory_ds(ds,output_dim,args)
-        return cls(net,args,output_dim)
+    def from_data_handler_ds(cls, data: DataHandler, args: Namespace) -> ModelHandler:
+        ltype = data.ltype
+        if ltype == 'single-dim':
+            out_channels = 1
+        else:
+            if not hasattr(data,'splits'):
+                data.setup('fit')
+            ds: InMemoryDataset = data.splits['train']
+            if ltype == 'multi-class':
+                out_channels = int(ds.y.max()) + 1
+            else: # if ltype == 'multi-label'
+                out_channels = ds.y.size(1)
+            assert out_channels > 2
+        net: Net = Net.from_in_memory_ds(ds,out_channels,args)
+        return cls(net,args,out_channels)

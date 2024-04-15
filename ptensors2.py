@@ -64,7 +64,7 @@ def linmaps2_1(x: Tensor, domains: atomspack2, reduce: Union[list[str],str]='sum
     if isinstance(reduce,str):
         reduce = [reduce]*4
     return torch.cat([
-        linmaps2_1_strict(x,domains,reduce),
+        *linmaps2_1_strict(x,domains,reduce),
         linmaps0_1(linmaps2_0(x,domains,reduce[2:]),domains)
     ],-1)
 
@@ -74,8 +74,8 @@ def linmaps2_2(x: Tensor, domains: atomspack2, reduce: Union[list[str],str]='sum
         reduce = [reduce]*4
     a = linmaps2_1_strict(x,domains,reduce)
     return torch.cat([
-        *linmaps1_2_strict(a[0]),
-        linmaps1_2(torch.cat(a[1:],-1)),# since the first two entries of 'a' reduce to the same value.
+        *linmaps1_2_strict(a[0],domains),
+        linmaps1_2(torch.cat(a[1:],-1),domains),# since the first two entries of 'a' reduce to the same value.
         x,
         x[domains.transpose_indicator],
     ],-1)
@@ -114,7 +114,7 @@ def transfer1_2_minimal(x: Tensor, data: TransferData2, reduce: Union[str,list[s
     #   but we have to avoid copying the "inv" part twice.
     domain = data.target
     cols = y_i_inv[domain.col_indicator,:x.size(1)] # one map
-    diag = torch.zeros_like(rows)
+    diag = torch.zeros_like(cols)
     diag[domain.diag_idx] = y_i_inv # two maps
     rows = y_i_inv[domain.row_indicator] # two maps
     return torch.cat([

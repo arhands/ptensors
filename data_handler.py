@@ -44,10 +44,11 @@ dataset_type = Union[
 class DataHandler(pl.LightningDataModule):
     splits: dict[Literal['train','val','test'],InMemoryDataset]
     batch_size: dict[Literal['train','val','test'],int]
-    
+    ltype: label_type
     def __init__(self, root: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform: BaseTransform, ltype: label_type, node_enc: encoding_flags, edge_enc: encoding_flags) -> None:
         super().__init__()
         # self.transform = PreprocessTransform()
+        self.ltype = ltype
         self.pre_transform = Compose(
             [
                 StandardPreprocessing(ltype,node_enc,edge_enc),
