@@ -12,7 +12,7 @@ parameters:
   mode:
     value: "max"
   eval_metric:
-    value: "Multi-Label-Accuracy"
+    value: "AUROC"
   loss:
     value: "BCEWithLogits"
   lr:

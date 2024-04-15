@@ -61,8 +61,8 @@ lr = args.hidden_channels
 mode: Literal['min', 'max'] = args.mode
 
 logger = WandbLogger(f"{args.dataset}-{args.seed}",run_path)
-wandb.define_metric("val_score",summary=mode)
-wandb.define_metric("test_score",summary=mode)
+# wandb.define_metric("val_score",summary=mode)
+# wandb.define_metric("test_score",summary=mode)
 
 data_handler: DataHandler = get_data_handler(pre_transform,args)
 data_handler.setup('fit')
