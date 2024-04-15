@@ -19,4 +19,3 @@ dependencies:
   - wandb==0.16.5
   - pip:
     - pytorch-optimizer==2.12.0
-prefix: /home/andrew/anaconda3/envs/ptensors

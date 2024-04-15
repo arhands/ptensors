@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import Any, Literal, Optional, Union, overload
+from typing import Any, Callable, Literal, Optional, Union, overload
 import typing
 
 from torch import Tensor
@@ -257,7 +257,12 @@ class FancyDataObject(Data):
     args: dict[str,Any] = dict()
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
-    for k in self.keys:#type: ignore
+    keys: Union[Callable[[],list[str]],list[str]] = self.keys
+    if callable(self.keys):
+      keys = self.keys()
+    else:
+      keys = self.keys
+    for k in keys:#type: ignore
       res: re.Match[str] | None = _key_regex.match(k)
       if res is not None:
         prefix, prop_name, _, key = res.groups()
