@@ -23,7 +23,9 @@ parameters:
     value: 0.1
   num_epochs:
     value: 350
-  optimizer: 
+  num_folds:
+    value: 10
+  optimizer:
     value: "adam"
   lr_scheduler:
     value: "StepLR"
