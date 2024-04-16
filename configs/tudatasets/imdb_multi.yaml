@@ -36,4 +36,6 @@ parameters:
   feature_encoder:
     value: "Embedding"
   max_cycle_size:
-    value: 10
+    value: 3
+  readout:
+    value: "mean"

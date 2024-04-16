@@ -38,10 +38,9 @@ def get_score_fn(name: Literal['Accuracy'], num_args: Literal[None] = None) -> B
 def get_score_fn(name: Literal['MAE','AUROC'], num_args: Literal[None] = None) -> Metric:...
 def get_score_fn(name: score_arg_type, num_args: Optional[int] = None) -> Metric:
     if name == 'Accuracy':
-        if num_args is None or num_args == 2:
+        if num_args is None or num_args <= 2:
             return BinaryAccuracy()
         else:
-            assert num_args > 2
             return MulticlassAccuracy(num_args,average='micro')
     elif name == 'Multi-Label-Accuracy':
         num_args = cast(int,num_args)
@@ -65,7 +64,7 @@ def get_lr_scheduler(sched: lr_scheduler_arg_type|None, optimizer: Optimizer, **
                 "scheduler" : ReduceLROnPlateau(optimizer,args['mode'],0.5,args['patience'],verbose=True),
                 "monitor" : "val_score"
             },
-        'StepLR' : StepLR(optimizer,50,0.5),
+        'StepLR' : lambda : StepLR(optimizer,50,0.5),
         None : lambda : None,
     }[sched]()
 
@@ -149,12 +148,12 @@ class ModelHandler(pl.LightningModule):
     @classmethod
     def from_data_handler_ds(cls, data: DataHandler, args: Namespace) -> ModelHandler:
         ltype = data.ltype
+        ds: InMemoryDataset = data.splits['train']
         if ltype == 'single-dim':
             out_channels = 1
         else:
             if not hasattr(data,'splits'):
                 data.setup('fit')
-            ds: InMemoryDataset = data.splits['train']
             if ltype == 'multi-class':
                 out_channels = int(ds.y.max()) + 1
             else: # if ltype == 'multi-label'
