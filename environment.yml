@@ -12,7 +12,7 @@ dependencies:
   - pyg::pyg
   - python=3.10
   - pytorch::pytorch-cuda=11.7
-  - conda-forge::pytorch-scatter
+  - pytorch-scatter
   - pytorch::pytorch==2.0.1
   - pytorch::torchaudio==2.0.2
   - pytorch::torchvision==0.15.2

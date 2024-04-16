@@ -258,10 +258,9 @@ class FancyDataObject(Data):
     transfer_objects: list[list[tuple[str,str,str]]] = [[],[],[]]
     atomspack_objects: list[list[str]] = [[],[]]
     keys: Union[Callable[[],list[str]],list[str]] = self.keys
-    if callable(self.keys):
-      keys = self.keys()
-    else:
-      keys = self.keys
+    keys: Union[Callable[[],list[str]],list[str]] = self.keys
+    if not isinstance(keys,list):
+      keys = keys()
     for k in keys:#type: ignore
       res: re.Match[str] | None = _key_regex.match(k)
       if res is not None:
