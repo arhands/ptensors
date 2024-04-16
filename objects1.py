@@ -2,6 +2,7 @@
 objects used for zeroth and first order interactions.
 """
 from __future__ import annotations
+from typing import cast
 import torch
 from torch import Tensor
 from torch_geometric.data import Data
@@ -187,9 +188,11 @@ class TransferData1(TransferData0):
     """
     num_nodes: int
     """The number of nodes in the original graph."""
-    def __init__(self,source,target,domain_map_edge_index,node_map_edge_index,num_nodes,intersect_indicator):
+    def __init__(self,source: atomspack1,target: atomspack1,domain_map_edge_index,node_map_edge_index,num_nodes: int|None,intersect_indicator):
         super().__init__(source,target,domain_map_edge_index)
         self.node_map_edge_index = node_map_edge_index
+        if num_nodes is None:
+            num_nodes = int(max(source.atoms.max().item(),target.atoms.max().item()) + 1)
         self.num_nodes = num_nodes
         self.intersect_indicator = intersect_indicator
     
@@ -231,14 +234,14 @@ class TransferData1(TransferData0):
         #     mask_intersect_domains = overlap_size_source == source_size[domain_overlaps_edge_index[0]]
         #     mask_intersect_nodes = mask_intersect_domains[intersect_indicator]
 
-
+        num_nodes: int
         if source.num_domains > 0:
-            num_nodes = source.atoms.max().item()
+            num_nodes = cast(int,source.atoms.max().item())
         else:
             num_nodes = 0
 
         if target.num_domains > 0:
-            num_nodes = max(num_nodes,target.atoms.max().item())
+            num_nodes = cast(int,max(num_nodes,target.atoms.max().item()))
         
         num_nodes += 1
 

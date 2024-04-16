@@ -1,0 +1,37 @@
+program: main.py
+name: tox21
+method: grid
+metric:
+  goal: maximize
+  name: val_score
+parameters:
+  num_layers:
+    value: 3
+  dataset:
+    value: "ogbg-moltox21"
+  mode:
+    value: "max"
+  eval_metric:
+    value: "AUROC"
+  loss:
+    value: "BCEWithLogits"
+  lr:
+    value: 0.0001
+  batch_size:
+    value: 128
+  seed: 
+    values: [1,2,3,4,5,6,7,8,9,10]
+  bn_momentum:
+    value: 0.1
+  num_epochs:
+    value: 200
+  optimizer: 
+    value: "adam"
+  hidden_channels: 
+    value: 256
+  feature_encoder:
+    value: "OGB"
+  readout:
+    value: "mean"
+  dropout:
+    value: 0.7

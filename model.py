@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Literal
 from data import FancyDataObject, PtensObjects
-from torch_geometric.utils import segment 
-from torch_geometric.nn import global_mean_pool, global_add_pool
+# from torch_geometric.utils import segment 
+from torch_scatter import scatter
 # from torch.nn import Linear, BatchNorm1d, ReLU, Module
 # from torch.nn.functional import dropout, relu
 
@@ -15,10 +15,12 @@ from objects1 import TransferData1, atomspack1
 from ptensors1 import linmaps1_0, linmaps1_1, transfer0_1, transfer1_0, transfer1_1
 from ptensors0 import transfer0_0
 from torch.nn import functional as F
-from data_handler import dataset_type
 
-from feature_encoders import get_edge_encoder_old, get_node_encoder_old, CycleEmbedding1
+from feature_encoders import CycleEmbedding
 from objects1 import TransferData0, TransferData1
+from torch_geometric.data import InMemoryDataset
+from argparse import Namespace
+from feature_encoders import get_edge_encoder, get_node_encoder
 # from objects2 import TransferData2
 
 _inner_mlp_mult = 2
@@ -54,16 +56,13 @@ class SplitLayer0_0(Module):
         self.epsilon2 = Parameter(torch.tensor(0.),requires_grad=True)
     def forward(self, node_rep: Tensor, edge_rep: Tensor, node2edge: TransferData0) -> tuple[Tensor,Tensor]:
         lift_aggr = transfer0_0(node_rep,node2edge)
-        # print(f"node->edge:\n{lift_aggr.std(-1).flatten()}")
         
 
         lvl_aggr_edge = self.lvl_mlp_1(torch.cat([lift_aggr,edge_rep],-1))
-        # print(f"lvl_aggr_edge:\n{lvl_aggr_edge.std(-1).flatten()}")
 
         # lvl_aggr_edge, lift_aggr = cat_edge_rep[:,:-node2edge_val.size(-1)], cat_edge_rep[:,-node2edge_val.size(-1):]
         
         lvl_aggr = transfer0_0(lvl_aggr_edge,node2edge.reverse())
-        # print(f"edge->node:\n{lvl_aggr.std(-1).flatten()}")
 
         node_out = self.lvl_mlp_2((1 + self.epsilon1) * node_rep + lvl_aggr)
         edge_out = self.lift_mlp((1 + self.epsilon2) * edge_rep + lift_aggr)
@@ -213,29 +212,25 @@ class ModelLayer(Module):
 
         return node_out, edge_out, cycle_out
 
-def get_out_dim(ds: dataset_type) -> int:
-    multi = {
-        'ogbg-moltox21'     : 12,
-        'peptides-struct'   : 11,
-
-        # tudatasets
-        'ENZYMES'           : 6 ,
-        'COLLAB'            : 3 ,
-        'IMDB-MULTI'        : 3 ,
-
-    }
-    if ds in multi:
-        return multi[ds]
-    else:
-        return 1
-
 class Net(Module):
-    def __init__(self, hidden_dim: int, num_layers: int, dropout: float, dataset: dataset_type, readout: Literal['mean','sum'], eps: float, momentum: float, reduce_ptensors: str, include_cycle_cycle: bool) -> None:
+    def __init__(self, 
+                 hidden_dim: int, 
+                 num_layers: int, 
+                 dropout: float, 
+                 readout: str, 
+                 eps: float, 
+                 momentum: float, 
+                 reduce_ptensors: str, 
+                 include_cycle_cycle: bool,
+                 atom_encoder: Module,
+                 edge_encoder: Module,
+                 cycle_encoder: CycleEmbedding,
+                 out_dim: int) -> None:
         super().__init__()
         # Initialization layers
-        self.atom_encoder = get_node_encoder_old(hidden_dim,dataset)
-        self.edge_encoder = get_edge_encoder_old(hidden_dim,dataset)
-        self.cycle_encoder = CycleEmbedding1(hidden_dim,dataset)
+        self.atom_encoder = atom_encoder
+        self.edge_encoder = edge_encoder
+        self.cycle_encoder = cycle_encoder
 
         # convolutional layers
         self.layers = ModuleList(ModelLayer(hidden_dim,dropout,eps,momentum, reduce_ptensors, include_cycle_cycle) for _ in range(num_layers))
@@ -246,7 +241,7 @@ class Net(Module):
             BatchNorm1d(hidden_dim*2,eps,momentum),
             ReLU(True),
         ) for _ in range(3)])
-        self.lin = Linear(hidden_dim*2,get_out_dim(dataset))
+        self.lin = Linear(hidden_dim*2,out_dim)
 
         self.dropout = dropout
     def forward(self, batch: FancyDataObject, ptens_obj: PtensObjects) -> Tensor:
@@ -254,50 +249,44 @@ class Net(Module):
         node_rep = self.atom_encoder(batch.x)
         edge_rep = self.edge_encoder(batch.edge_attr)
         cycle_rep = self.cycle_encoder(batch.x,ptens_obj['nodes','cycles',1])
-        # print(f"emb node rep:\n{node_rep.std(-1).flatten()}")
+
         # performing message passing
         for layer in self.layers:
-            # print(f"pre node rep:\n{node_rep.std(-1).flatten()}")
             node_rep,edge_rep,cycle_rep = layer(node_rep,edge_rep,cycle_rep,ptens_obj)
-            # print(f"post node rep:\n{node_rep.std(-1).flatten()}")
 
         # finalizing model
-        if self.readout == 'mean':
-            pool_fn = global_mean_pool
-        else:
-            pool_fn = global_add_pool
         reps: list[Tensor] = [
-            pool_fn(node_rep,batch.batch),
-            pool_fn(edge_rep,ptens_obj['edges'].get_batch0(),batch.num_graphs),
-            pool_fn(cycle_rep,ptens_obj['cycles'].get_batch1(),batch.num_graphs),
+            scatter(node_rep,batch.batch,0,dim_size=batch.num_graphs,reduce=self.readout),
+            scatter(edge_rep,ptens_obj['edges',0].get_batch0(),0,dim_size=batch.num_graphs,reduce=self.readout),
+            scatter(cycle_rep,ptens_obj['cycles',1].get_batch1(),0,dim_size=batch.num_graphs,reduce=self.readout),
         ]
-        # rep: Tensor
-        # name: str
-        # for rep, name, order in [(node_rep,'nodes',0),(edge_rep,'edges',0),(cycle_rep,'cycles',1)]:
-        #     ap: atomspack1 = data[(name,0)]
-        #     # rep0 = rep
-        #     if order == 1:
-        #         # NOTE: this will cause p-tensors to be weighted equally when doing global mean pooling,
-        #         # rather than weighted by size.
-        #         rep = linmaps1_0(rep,ap,self.readout)
-        #     if isinstance(ap.raw_num_domains,int):
-        #         reps.append(segment(rep,torch.tensor([len(rep)],dtype=torch.int32,device=rep.device),self.readout))
-        #     else:
-        #         A = torch.empty(len(ap.raw_num_domains) + 1,dtype=ap.raw_num_domains.dtype,device=ap.raw_num_domains.device)
-        #         A[0] = 0
-        #         A[1:] = ap.raw_num_domains.cumsum(0)
-        #         reps.append(segment(rep,A,self.readout))
-        #         # print(f"{name}_rep =\n{rep}")
-        #         # print(f"rep['{name}'] =\n{reps[-1]}")
-        #     # # debug:
-        #     # assert self.readout == 'sum', self.readout
-        #     # assert torch.allclose(global_add_pool(rep0,ap.get_batch0() if order == 0 else ap.get_batch1()),reps[-1])
-        # for rep, name, order in [(node_rep,'nodes',0),(edge_rep,'edges',0),(cycle_rep,'cycles',1)]:
-        #     ap: atomspack1 = data[(name,0)]
-        #     reps.append(global_add_pool(rep,ap.get_batch0() if order == 0 else ap.get_batch1(),len(ap.raw_num_domains) if isinstance(ap.raw_num_domains,Tensor) else 1))
-        #
-        # reps = [reps[0]]
-        rep = torch.sum(torch.stack([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)]),0)
+            
+        rep: Tensor = torch.sum(torch.stack([mlp(rep) for mlp, rep in zip(self.pool_mlps,reps)]),0)
 
         rep = F.dropout(rep,self.dropout,self.training)
         return self.lin(rep)
+    @classmethod
+    def from_in_memory_ds(cls, ds: InMemoryDataset, output_dim: int, args: Namespace) -> Net:
+        encoder_name : Literal['OGB','Embedding'] = args.feature_encoder
+        hidden_channels : int = args.hidden_channels
+        if encoder_name == 'OGB':
+            node_encoder = lambda: get_node_encoder(hidden_channels,'AtomEncoder')
+            edge_encoder = get_edge_encoder(hidden_channels,'BondEncoder')
+        else:
+            num_unique_features: int = ds.x.max().item() + 1
+            node_encoder = lambda: get_node_encoder(hidden_channels,'Embedding',num_unique_features)
+            edge_encoder = get_edge_encoder(hidden_channels,'Embedding' if ds.num_edge_features == 1 else 'EmbeddingBag',ds.edge_attr.max().item() + 1)
+        cycle_encoder = CycleEmbedding(hidden_channels,node_encoder())
+        net = Net(hidden_channels,
+                  args.num_layers,
+                  args.dropout,
+                  args.readout,
+                  0.00001,
+                  args.bn_momentum,
+                  args.ptensor_reduction,
+                  args.include_cycle2cycle,
+                  node_encoder(),
+                  edge_encoder,
+                  cycle_encoder,
+                  output_dim)
+        return net

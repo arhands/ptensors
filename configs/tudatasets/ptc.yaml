@@ -1,0 +1,37 @@
+program: main.py
+name: PTC
+method: grid
+metric:
+  goal: maximize
+  name: val_score
+parameters:
+  dataset:
+    value: "PTC_MR"
+  mode:
+    value: "max"
+  eval_metric:
+    value: "Accuracy"
+  loss:
+    value: "BCEWithLogits"
+  lr:
+    values: [0.01,0.001]
+  batch_size:
+    values: [32,128]
+  seed: 
+    values: [1,2,3,4,5,6,7,8,9,10]
+  bn_momentum:
+    value: 0.1
+  num_epochs:
+    value: 350
+  num_folds: 
+    value: 10
+  optimizer: 
+    value: "adam"
+  lr_scheduler:
+    value: "StepLR"
+  patience:
+    value: 50
+  hidden_channels: 
+    values: [16,32]
+  feature_encoder:
+    value: "Embedding"

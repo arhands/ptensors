@@ -14,70 +14,10 @@ The pipeline that this is designed for is as follows:
 
 ## Installation and Reproducing Experiments
 The following setup instructions assumes a linux operating system with CUDA and Anaconda installed.
-Run [setup.sh](https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/setup.sh) to setup the Conda environment, then run `conda activate ptensors`.
+Run `conda env create -f environment.yml` to setup the Conda environment, then run `conda activate ptensors`.
+Then, call `wandb login` to login to `wandb`.
 
-Now, refer to the following table for reproducing experiments:
-<table>
-  <tr>
-    <td>Dataset</td>
-    <td>Script</td>
-    <td>Reference Value (direction)</td>
-  </tr>
-  <tr>
-    <td>ZINC-12K</td>
-    <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/zinc_subset.sh">zinc_subset.sh</a></td>
-    <td>0.075±0.003 (↓)</td>
-  </tr>
+For each of the experiments, start a sweep using `wandb sweep -p ptensors ./configs/EXPERIMENT_CHOICE`, where `EXPERIMENT_CHOICE` is replaced with the config file corresponding to the experiment of choice.
+`wandb` will then provide a command in its output to begin experiments.
 
-  <tr>
-    <td>ZINC-Full</td>
-    <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/zinc_full.sh">zinc_full.sh</a></td>
-    <td>0.024±0.001* (↓)</td>
-  </tr>
-  
-  <tr>
-    <td>OGBG-MolHIV</td>
-    <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/ogbmol_hiv.sh">ogbmol_hiv.sh</a></td>
-    <td>80.47±0.87 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>Tox21</td>
-    <td><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/moltox21.sh">moltox21.sh</a></td>
-    <td>84.95±0.58 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>MUTAG</td>
-    <td rowspan="3"><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/tudatasets_set1.sh">tudatasets_set1.sh</a></td>
-    <td>92.9±1.7 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>PTC</td>
-    <td>71.7±5.2 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>NCI1</td>
-    <td>84.2±1.7 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>PROTEINS</td>
-    <td rowspan="3"><a href="https://github.com/arhands/ptensors/blob/ac5943bed7bc30a9db7e4cfbc5b26cd576ff6076/tudatasets_set2.sh">tudatasets_set2.sh</a></td>
-    <td>75.9±2.5 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>IMDB-B</td>
-    <td>77.9±3.2 (↑)</td>
-  </tr>
-  
-  <tr>
-    <td>IMDB-M</td>
-    <td>54.3±2.0 (↑)</td>
-  </tr>
-  
-</table>
-*The standard deviation was not present in the original AIStats writeup and was calculated afterwards.
+Do note for the TUDatasets, we perform a grid search and select the best performing hyperparameters to compute our performence. The scores for the other datasets can be computed by taking the mean and standard deviation of the `test_value` score.

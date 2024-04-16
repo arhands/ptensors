@@ -1,3 +1,4 @@
+from argparse import Namespace
 from typing import Literal, Union
 import lightning.pytorch as pl
 import numpy as np
@@ -15,6 +16,8 @@ from sklearn.model_selection import StratifiedKFold
 
 _tu_datasets = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
 tu_dataset_type = Literal['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
+tu_dataset_type_list: list[str] = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
+dataset_type_list: list[str] = ['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21',*tu_dataset_type_list]
 dataset_type = Union[
     Literal['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21'],tu_dataset_type
     ]
@@ -41,10 +44,11 @@ dataset_type = Union[
 class DataHandler(pl.LightningDataModule):
     splits: dict[Literal['train','val','test'],InMemoryDataset]
     batch_size: dict[Literal['train','val','test'],int]
-    
-    def __init__(self, root: str, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform: BaseTransform, ltype: label_type, node_enc: encoding_flags, edge_enc: encoding_flags) -> None:
+    ltype: label_type
+    def __init__(self, root: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform: BaseTransform, ltype: label_type, node_enc: encoding_flags, edge_enc: encoding_flags) -> None:
         super().__init__()
         # self.transform = PreprocessTransform()
+        self.ltype = ltype
         self.pre_transform = Compose(
             [
                 StandardPreprocessing(ltype,node_enc,edge_enc),
@@ -52,7 +56,6 @@ class DataHandler(pl.LightningDataModule):
             ]
         )
         self.root = root
-        self.device = device
         self.batch_size = {
             'train' : train_batch_size,
             'val' : val_batch_size,
@@ -82,8 +85,8 @@ class DataHandler(pl.LightningDataModule):
 #################################################################################################################################
 
 class ZINCDatasetHandler(DataHandler):
-    def __init__(self, root: str, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform, subset: bool = True) -> None:
-        super().__init__(root + '/ZINC', device, train_batch_size, val_batch_size, test_batch_size, pre_transform,'single-dim',None,None)
+    def __init__(self, root: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform, subset: bool = True) -> None:
+        super().__init__(root + '/ZINC', train_batch_size, val_batch_size, test_batch_size, pre_transform,'single-dim',None,None)
         self.subset: bool = subset
 
     def prepare_data(self) -> None:
@@ -99,12 +102,12 @@ class ZINCDatasetHandler(DataHandler):
 
 class OGBGDatasetHandler(DataHandler):
     ds_name: Literal['ogbg-molhiv','ogbg-moltox21']
-    def __init__(self, root: str, ds_name: Literal['ogbg-molhiv','ogbg-moltox21'], device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform) -> None:
+    def __init__(self, root: str, ds_name: Literal['ogbg-molhiv','ogbg-moltox21'], train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform) -> None:
         if ds_name == 'ogbg-molhiv':
             ltype = 'single-dim'
         else:
             ltype = 'multi-label'
-        super().__init__(root, device, train_batch_size, val_batch_size, test_batch_size, pre_transform,ltype,'OGB','OGB')
+        super().__init__(root, train_batch_size, val_batch_size, test_batch_size, pre_transform,ltype,'OGB','OGB')
         self.ds_name = ds_name
     
     def prepare_data(self) -> None:
@@ -133,13 +136,13 @@ class OGBGDatasetHandler(DataHandler):
 class TUDatasetHandler(DataHandler):
     ds_name: tu_dataset_type
     ds: TUDataset
-    def __init__(self, root: str, ds_name: tu_dataset_type, device: str, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform, num_folds=None, seed=0) -> None:
+    def __init__(self, root: str, ds_name: tu_dataset_type, train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform, num_folds=None, seed=0) -> None:
         use_degree: encoding_flags = None if ds_name == 'REDDIT_BINARY' else "degree"
         if ds_name in ['COLLAB','IMDB-MULTI','ENZYMES']:
             ltype = 'multi-class'
         else:
             ltype = 'single-dim'
-        super().__init__(root, device, train_batch_size, val_batch_size, test_batch_size, pre_transform,ltype,use_degree,use_degree)
+        super().__init__(root, train_batch_size, val_batch_size, test_batch_size, pre_transform,ltype,use_degree,use_degree)
         self.num_folds = num_folds
         self.seed = seed
         self.ds_name = ds_name
@@ -163,3 +166,25 @@ class TUDatasetHandler(DataHandler):
                 'val' : self.ds[test_idx],
                 'test' : self.ds[test_idx],
             }
+def get_data_handler(pre_transform, args: Namespace) -> DataHandler:
+    ds_name: dataset_type = args.dataset
+    ds_path = './data/'
+    handlerArgs = {
+        'root' : ds_path,
+        'train_batch_size' : args.batch_size,
+        'val_batch_size' : args.eval_batch_size,
+        'test_batch_size' : args.eval_batch_size,
+        'pre_transform' : pre_transform,
+    }
+    if ds_name in ['ZINC','ZINC-Full']:
+        data_handler = ZINCDatasetHandler(subset = ds_name != 'ZINC-Full',**handlerArgs)
+        # dataset = 'ZINC'
+    elif ds_name in ['ogbg-molhiv','ogbg-moltox21']:
+        data_handler = OGBGDatasetHandler(ds_name=ds_name,**handlerArgs)#type: ignore
+    elif ds_name in _tu_datasets:
+        data_handler = TUDatasetHandler(ds_name=ds_name,num_folds=args.num_folds,seed=0,**handlerArgs)#type: ignore
+        # NOTE: we assume here that the seeds will be given as [1,...,args.num_folds]
+        data_handler.set_fold_idx(args.seed - 1)
+    else:
+        raise NotImplementedError(ds_name)
+    return data_handler
