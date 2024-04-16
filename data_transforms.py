@@ -101,7 +101,7 @@ class AddChordlessCycles(AddAtomspack):
     self.undirected = undirected
   def get_domains(self, data: FancyDataObject) -> list[Tensor]:
     G: nx.Graph = to_networkx(data,to_undirected=self.undirected)# TODO: add check
-    return [torch.tensor(c) for c in nx.simple_cycles(G,self.max_size)]#type: ignore
+    return [torch.tensor(c) for c in nx.chordless_cycles(G,self.max_size)]#type: ignore
     # cycles = get_induced_cycles(from_edge_index(data.edge_index,data.num_nodes),self.max_size if self.max_size is not None else inf)#type: ignore
     # return [torch.tensor(c.to_list()) for c in cycles]
 
