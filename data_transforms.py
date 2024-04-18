@@ -109,7 +109,7 @@ class AddChordlessCycles(AddAtomspack):
 # dataset specific transforms
 #################################################################################################################################
 encoding_flags = Literal['OGB','degree',None]
-label_type = Literal['single-dim','multi-label','multi-class']
+label_type = Literal['single-dim','multi-label','multi-class','multi-regression']
 class StandardPreprocessing(BaseTransform):
   label: label_type
   node_encoding: encoding_flags
@@ -169,25 +169,7 @@ class StandardPreprocessing(BaseTransform):
       y = y.long()
     elif self.label == 'single-dim':
       y = y.view(-1,1).float()
+    # else: we do no preprocessing.
     data.y = y#type: ignore
 
     return data
-
-# class ZINCPreProcessingBase(BaseTransform):
-#   @overload
-#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
-#   @overload
-#   def __call__(self, data: Data) -> Data:...
-#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
-#     data.x = data.x.flatten()#type: ignore
-#     data.y = data.y.unsqueeze(-1)#type: ignore
-#     return data
-
-# class OGBPreprocessingBase(BaseTransform):
-#   @overload
-#   def __call__(self, data: FancyDataObject) -> FancyDataObject:...
-#   @overload
-#   def __call__(self, data: Data) -> Data:...
-#   def __call__(self, data: Data|FancyDataObject) -> Data|FancyDataObject:
-#     data.y = data.y.float()
-#     return data

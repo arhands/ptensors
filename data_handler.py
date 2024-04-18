@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import Literal, Union
+from typing import Literal, Union, cast
 import lightning.pytorch as pl
 import numpy as np
 from torch import Tensor
@@ -17,9 +17,9 @@ from sklearn.model_selection import StratifiedKFold
 _tu_datasets = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
 tu_dataset_type = Literal['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
 tu_dataset_type_list: list[str] = ['MUTAG','ENZYMES','PROTEINS','COLLAB','IMDB-BINARY','REDDIT_BINARY','IMDB-MULTI','NCI1','NCI109','PTC_MR']
-dataset_type_list: list[str] = ['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21',*tu_dataset_type_list]
+dataset_type_list: list[str] = ['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','peptides-func','ogbg-moltox21',*tu_dataset_type_list]
 dataset_type = Union[
-    Literal['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','graphproperty','ogbg-moltox21'],tu_dataset_type
+    Literal['ZINC','ZINC-Full','ogbg-molhiv','peptides-struct','peptides-func','ogbg-moltox21'],tu_dataset_type
     ]
 # def _get_path(base_path: str,name: dataset_type):
 #     if name == 'ZINC':
@@ -133,6 +133,27 @@ class OGBGDatasetHandler(DataHandler):
             }
         return splits
 
+class LRGBDatasetHandler(DataHandler):
+    ds_name: Literal['peptides-func','peptides-struct']
+    def __init__(self, root: str, ds_name: Literal['peptides-func','peptides-struct'], train_batch_size: int, val_batch_size: int, test_batch_size: int, pre_transform) -> None:
+        ltype : label_type
+        if ds_name == 'peptides-func':
+            ltype = 'multi-class'
+        else:
+            ltype = 'multi-regression'
+        # even thought they are not actually both multi-class
+        super().__init__(root, train_batch_size, val_batch_size, test_batch_size, pre_transform,ltype,'OGB','OGB')
+        self.ds_name = ds_name
+    
+    def prepare_data(self) -> None:
+        self._get_splits()
+    
+    def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
+        return cast(dict[Literal['train','val','test'],InMemoryDataset],{
+            split : LRGBDataset(self.ds_name,self.root,split,pre_transform=self.pre_transform)
+            for split in ['train','val','test']
+        })
+
 class TUDatasetHandler(DataHandler):
     ds_name: tu_dataset_type
     ds: TUDataset
@@ -185,6 +206,8 @@ def get_data_handler(pre_transform, args: Namespace) -> DataHandler:
         data_handler = TUDatasetHandler(ds_name=ds_name,num_folds=args.num_folds,seed=0,**handlerArgs)#type: ignore
         # NOTE: we assume here that the seeds will be given as [1,...,args.num_folds]
         data_handler.set_fold_idx(args.seed - 1)
+    elif ds_name in ['peptides-struct','peptides-func']:
+        data_handler = LRGBDatasetHandler(ds_name,**handlerArgs)
     else:
         raise NotImplementedError(ds_name)
     return data_handler
