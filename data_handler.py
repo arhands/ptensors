@@ -150,7 +150,7 @@ class LRGBDatasetHandler(DataHandler):
     
     def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
         return cast(dict[Literal['train','val','test'],InMemoryDataset],{
-            split : LRGBDataset(self.ds_name,self.root,split,pre_transform=self.pre_transform)
+            split : LRGBDataset(self.root,self.ds_name,split,pre_transform=self.pre_transform)
             for split in ['train','val','test']
         })
 
@@ -207,7 +207,7 @@ def get_data_handler(pre_transform, args: Namespace) -> DataHandler:
         # NOTE: we assume here that the seeds will be given as [1,...,args.num_folds]
         data_handler.set_fold_idx(args.seed - 1)
     elif ds_name in ['peptides-struct','peptides-func']:
-        data_handler = LRGBDatasetHandler(ds_name,**handlerArgs)
+        data_handler = LRGBDatasetHandler(ds_name=ds_name,**handlerArgs)#type: ignore
     else:
         raise NotImplementedError(ds_name)
     return data_handler

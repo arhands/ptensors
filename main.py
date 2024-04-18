@@ -15,6 +15,7 @@ from data_transforms import AddNodes, AddEdges, AddChordlessCycles, AddTransferM
 from lightning.pytorch.loggers.wandb import WandbLogger
 from torch_geometric import seed_everything
 from utils import ensure_exists
+import os
 seed_everything(args.seed)
 
 # TODO: come up for better solution for this.
@@ -51,7 +52,9 @@ pre_transform = GeneratePtensObject(
 ds_name : str = args.dataset
 seed: int = args.seed
 ds_path = './data/'
-run_path: str = f'./runs/{ds_name}/{seed}/'
+project_dir = f'./runs/{ds_name}'
+local_run_id = 1 + max(0,*[int(s) for s in os.listdir(project_dir) if s.isdigit()])
+run_path: str = f'{project_dir}/{local_run_id}/'
 ensure_exists(run_path + "wandb")
 
 dataset: dataset_type
@@ -60,7 +63,7 @@ hidden_channels = args.hidden_channels
 lr = args.hidden_channels
 mode: Literal['min', 'max'] = args.mode
 
-logger = WandbLogger(f"{args.dataset}-{args.seed}",run_path)
+logger = WandbLogger(save_dir=run_path)
 # wandb.define_metric("val_score",summary=mode)
 # wandb.define_metric("test_score",summary=mode)
 
