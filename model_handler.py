@@ -7,7 +7,7 @@ from torch import Tensor
 import torch
 from data import FancyDataObject, PtensObjects
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, Metric
-from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy, MultilabelAccuracy
+from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy, MultilabelAccuracy,  MulticlassAveragePrecision
 from torch.nn import L1Loss, BCEWithLogitsLoss, MSELoss, CrossEntropyLoss
 from torch.optim import Adam, Optimizer
 from pytorch_optimizer.optimizer.sam import SAM
@@ -28,10 +28,10 @@ def get_loss_fn(name: loss_arg_type) -> Module:
         'CrossEntropy' : CrossEntropyLoss,
     }[name]()
 
-score_arg_type_list = ['MAE','AUROC','Accuracy','Multi-Label-Accuracy']
-score_arg_type = Literal['MAE','AUROC','Accuracy','Multi-Label-Accuracy']
+score_arg_type_list = ['MAE','AUROC','Accuracy','Multi-Label-Accuracy','MulticlassAveragePrecision']
+score_arg_type = Literal['MAE','AUROC','Accuracy','Multi-Label-Accuracy','MulticlassAveragePrecision']
 @overload
-def get_score_fn(name: Literal['Accuracy','Multi-Label-Accuracy'], num_args: int) -> Metric:...
+def get_score_fn(name: Literal['Accuracy','Multi-Label-Accuracy','MulticlassAveragePrecision'], num_args: int) -> Metric:...
 @overload
 def get_score_fn(name: Literal['Accuracy'], num_args: Literal[None] = None) -> BinaryAccuracy:...
 @overload
@@ -46,6 +46,10 @@ def get_score_fn(name: score_arg_type, num_args: Optional[int] = None) -> Metric
         num_args = cast(int,num_args)
         assert num_args > 1
         return MultilabelAccuracy(num_args,average='micro')
+    elif name == 'MulticlassAveragePrecision':
+        num_args = cast(int,num_args)
+        # 'macro' computes the score across all of the classes and then averages them.
+        return MulticlassAveragePrecision(num_args,average='macro')
     else:
         return {
             'MAE' : MeanAbsoluteError,
@@ -156,8 +160,9 @@ class ModelHandler(pl.LightningModule):
                 data.setup('fit')
             if ltype == 'multi-class':
                 out_channels = int(ds.y.max()) + 1
-            else: # if ltype == 'multi-label'
+                assert out_channels > 2
+            else: # if ltype in ['multi-label','multi-regression']
                 out_channels = ds.y.size(1)
-            assert out_channels > 2
+                assert out_channels >= 2
         net: Net = Net.from_in_memory_ds(ds,out_channels,args)
         return cls(net,args,out_channels)

@@ -7,7 +7,7 @@ def get_args() -> Namespace:
   parser.add_argument('--dataset',choices=dataset_type_list,required=True)
 
   # general environment arguments
-  parser.add_argument('--enable_model_summary',action="store_true")
+  parser.add_argument('--enable_model_summary',type=bool,default=False)
   parser.add_argument('--show_epoch_progress_bar',type=bool,default=True)
   parser.add_argument('--device',type=str,default=None)
   parser.add_argument('--eval_batch_size',type=int,default=512)
