@@ -57,10 +57,6 @@ local_run_id = 1 + max(0,*[int(s) for s in os.listdir(project_dir) if s.isdigit(
 run_path: str = f'{project_dir}/{local_run_id}/'
 ensure_exists(run_path + "wandb")
 
-dataset: dataset_type
-train_batch_size = args.batch_size
-hidden_channels = args.hidden_channels
-lr = args.hidden_channels
 mode: Literal['min', 'max'] = args.mode
 
 logger = WandbLogger(save_dir=run_path)
