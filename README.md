@@ -21,3 +21,22 @@ For each of the experiments, start a sweep using `wandb sweep -p ptensors ./conf
 `wandb` will then provide a command in its output to begin experiments.
 
 Do note for the TUDatasets, we perform a grid search and select the best performing hyperparameters to compute our performence. The scores for the other datasets can be computed by taking the mean and standard deviation of the `test_value` score.
+
+## Citation
+Please cite as:
+```
+@InProceedings{pmlr-v238-r-hands24a,
+  title = 	 { P-tensors: a General Framework for Higher Order Message Passing in Subgraph Neural Networks },
+  author =       {R Hands, Andrew and Sun, Tianyi and Kondor, Risi},
+  booktitle = 	 {Proceedings of The 27th International Conference on Artificial Intelligence and Statistics},
+  pages = 	 {424--432},
+  year = 	 {2024},
+  editor = 	 {Dasgupta, Sanjoy and Mandt, Stephan and Li, Yingzhen},
+  volume = 	 {238},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {02--04 May},
+  publisher =    {PMLR},
+  pdf = 	 {https://proceedings.mlr.press/v238/r-hands24a/r-hands24a.pdf},
+  url = 	 {https://proceedings.mlr.press/v238/r-hands24a.html}
+}
+```
