@@ -53,7 +53,8 @@ ds_name : str = args.dataset
 seed: int = args.seed
 ds_path = './data/'
 project_dir = f'./runs/{ds_name}'
-local_run_id = 1 + max(0,*[int(s) for s in os.listdir(project_dir) if s.isdigit()])
+local_run_id = seed
+# local_run_id = 1 + max(0,*[int(s) for s in os.listdir(project_dir) if s.isdigit()])
 run_path: str = f'{project_dir}/{local_run_id}/'
 ensure_exists(run_path + "wandb")
 

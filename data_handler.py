@@ -8,7 +8,7 @@ from ogb.graphproppred import PygGraphPropPredDataset
 # from transforms import PreprocessTransform_4 as PreprocessTransform
 from torch_geometric.loader import DataLoader
 from data import FancyDataObject, PtensObjects
-from torch_geometric.data import InMemoryDataset
+from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.transforms import BaseTransform, Compose
 from data_transforms import StandardPreprocessing, encoding_flags, label_type
 
@@ -52,7 +52,7 @@ class DataHandler(pl.LightningDataModule):
         self.pre_transform = Compose(
             [
                 StandardPreprocessing(ltype,node_enc,edge_enc),
-                pre_transform
+                pre_transform,
             ]
         )
         self.root = root
@@ -67,7 +67,7 @@ class DataHandler(pl.LightningDataModule):
     def _get_splits(self) -> dict[Literal['train','val','test'],InMemoryDataset]:...
 
     def setup(self, stage: Literal['fit','test','predict']):#type: ignore
-        self.splits = self._get_splits() 
+        self.splits = self._get_splits()
 
     def train_dataloader(self):
         return self._get_dataloader('train',True)
@@ -176,7 +176,12 @@ class TUDatasetHandler(DataHandler):
         self.splits = self._get_splits()
     def _get_splits(self) -> dict[Literal['train', 'val', 'test'], InMemoryDataset]:
         # adapted from GIN
-        ds = TUDataset(self.root,self.ds_name,pre_transform=self.pre_transform,use_edge_attr=True,use_node_attr=True)
+        def transform(data: Data):
+            data2 = FancyDataObject()
+            data2.__dict__.update(data.__dict__)
+            data2.num_nodes = len(data2.x)#type: ignore
+            return data2
+        ds = TUDataset(self.root,self.ds_name,pre_transform=self.pre_transform,transform=transform,use_edge_attr=True,use_node_attr=True)
         skf = StratifiedKFold(self.num_folds,shuffle=True,random_state=self.seed)#type: ignore
         if not hasattr(self,'split_indices'):
             self.split_indices = list(skf.split(np.zeros(len(ds)),ds.y))
