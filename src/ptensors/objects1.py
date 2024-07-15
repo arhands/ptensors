@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import cast
 import torch
 from torch import Tensor
-from torch_geometric.data import Data
+# from torch_geometric.data import Data
 from torch_scatter import scatter_add
 
 class atomspack1:

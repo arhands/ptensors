@@ -2,10 +2,10 @@
 objects used for second order interactions.
 """
 from __future__ import annotations
-from typing import Optional, Union
+from typing import Optional
 import torch
 from torch import Tensor
-from objects1 import atomspack1, TransferData1
+from .objects1 import atomspack1, TransferData1
 def _get_row_col_indicator(subgraphs: list[Tensor]|list[list]) -> tuple[Tensor,Tensor]:
     r"""
     NOTE: this assumes 'domain_indicator' is ordered the same as 'subgraphs'

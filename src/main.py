@@ -1,6 +1,5 @@
 from argparse import Namespace
 
-import wandb
 from arg_handler import get_args
 args: Namespace = get_args()
 
@@ -9,13 +8,12 @@ from typing import Literal
 from torch.cuda import is_available
 from training_pipeline.model_handler import ModelHandler
 
-from training_pipeline.data_handler import DataHandler, dataset_type, _tu_datasets, get_data_handler
+from training_pipeline.data_handler import DataHandler, get_data_handler
 from training_pipeline.train_handler import get_trainer
 from core_data.data_transforms import AddNodes, AddEdges, AddChordlessCycles, AddTransferMap, GeneratePtensObject
 from lightning.pytorch.loggers.wandb import WandbLogger
 from torch_geometric import seed_everything
 from utils import ensure_exists
-import os
 seed_everything(args.seed)
 
 # TODO: come up for better solution for this.
@@ -51,7 +49,6 @@ pre_transform = GeneratePtensObject(
 )
 ds_name : str = args.dataset
 seed: int = args.seed
-ds_path = './data/'
 project_dir = f'./runs/{ds_name}'
 local_run_id = seed
 # local_run_id = 1 + max(0,*[int(s) for s in os.listdir(project_dir) if s.isdigit()])

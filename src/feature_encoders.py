@@ -3,27 +3,11 @@ import torch
 from torch.nn import Module, Parameter, Embedding, EmbeddingBag, Linear, Sequential
 from torch import Tensor
 from typing import Literal, Optional, Union, overload, cast
-from torch_scatter import scatter_sum
 from ogb.graphproppred.mol_encoder import BondEncoder, AtomEncoder
 from training_pipeline.data_handler import dataset_type
 from ptensors.objects1 import TransferData1
 from ptensors.ptensors1 import transfer0_1
 
-class DummyNodeEncoder(Module):
-    r"""
-    Equivalent to torch.nn.Embedding with default options.
-    """
-    def __init__(self, hidden_dim: int) -> None:
-        super().__init__()
-        self.weight = Embedding(1,hidden_dim)
-    def forward(self, x: Tensor) -> Tensor:
-        return self.weight(torch.zeros_like(x,dtype=torch.int32))
-
-def get_tu_node_encoder(deg_count: int, hidden_dim: int):
-    return Embedding(deg_count,hidden_dim)
-def get_tu_edge_encoder(deg_count: int, hidden_dim: int):
-    return EmbeddingBag(deg_count,hidden_dim)
-# TODO: move type-casting to preprocessing
 @overload
 def get_edge_encoder(hidden_dim: int, name: Literal['BondEncoder'], feature_count: Literal[None] = None) -> Module:...
 @overload

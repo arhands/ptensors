@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import Any, Callable, Literal, Optional, Union, overload
+from typing import Any, Callable, Literal, Union, overload
 import typing
 
 from torch import Tensor
@@ -296,13 +296,13 @@ class FancyDataObject(Data):
     # assert "_and_" not in source_key
     # assert "_and_" not in target_key
     self._set_ptens_param(f'{source_key}_and_{target_key}',value,['source','num_nodes','target','_atoms2','_domains_indicator2'])
-  @staticmethod
-  def assert_valid_domain_name(name: str) -> None:
-    """
-      A helper method for checking if a name is valid. 
-      This is not called here, but is useful for transforms and
-      such for input validation when they are created.
-    """
-    assert "__" not in name
-    assert "_and_" not in name
-    assert re.match("^[_0-9a-zA-Z]+$",name) is not None
+  # @staticmethod
+  # def assert_valid_domain_name(name: str) -> None:
+  #   """
+  #     A helper method for checking if a name is valid. 
+  #     This is not called here, but is useful for transforms and
+  #     such for input validation when they are created.
+  #   """
+  #   assert "__" not in name
+  #   assert "_and_" not in name
+  #   assert re.match("^[_0-9a-zA-Z]+$",name) is not None

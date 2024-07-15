@@ -3,10 +3,10 @@ from typing import Union
 import torch
 from torch import Tensor
 from torch_scatter import scatter
-from torch_geometric.data import Data
-from objects1 import TransferData1, atomspack1
-from ptensors1 import linmaps1_0, linmaps0_1, transfer0_1
-from objects2 import TransferData2, atomspack2, atomspack2_minimal
+# from torch_geometric.data import Data
+# from .objects1 import TransferData1, atomspack1
+from .ptensors1 import linmaps1_0, linmaps0_1
+from .objects2 import TransferData2, atomspack2
 
 def linmaps0_2(x: Tensor, domains: atomspack2):
     # full_broadcast = x[domains.atoms2]

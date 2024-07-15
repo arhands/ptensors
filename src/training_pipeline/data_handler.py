@@ -2,7 +2,6 @@ from argparse import Namespace
 from typing import Literal, Union, cast
 import lightning.pytorch as pl
 import numpy as np
-from torch import Tensor
 from torch_geometric.datasets import ZINC, LRGBDataset, TUDataset
 from ogb.graphproppred import PygGraphPropPredDataset
 # from transforms import PreprocessTransform_4 as PreprocessTransform
