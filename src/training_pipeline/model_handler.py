@@ -5,7 +5,7 @@ from pytorch_optimizer.base.types import OPTIMIZER, PARAMETERS
 from torch.nn import Module
 from torch import Tensor
 import torch
-from data import FancyDataObject, PtensObjects
+from core_data.data import FancyDataObject, PtensObjects
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, Metric
 from torchmetrics.classification import BinaryAUROC, BinaryAccuracy, MulticlassAccuracy, MultilabelAccuracy,  MulticlassAveragePrecision
 from torch.nn import L1Loss, BCEWithLogitsLoss, MSELoss, CrossEntropyLoss

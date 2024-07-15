@@ -7,10 +7,10 @@ from torch_geometric.datasets import ZINC, LRGBDataset, TUDataset
 from ogb.graphproppred import PygGraphPropPredDataset
 # from transforms import PreprocessTransform_4 as PreprocessTransform
 from torch_geometric.loader import DataLoader
-from data import FancyDataObject, PtensObjects
+from core_data.data import FancyDataObject, PtensObjects
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.transforms import BaseTransform, Compose
-from data_transforms import StandardPreprocessing, encoding_flags, label_type
+from core_data.data_transforms import StandardPreprocessing, encoding_flags, label_type
 
 from sklearn.model_selection import StratifiedKFold
 

@@ -5,9 +5,9 @@ from torch import Tensor
 from typing import Literal, Optional, Union, overload, cast
 from torch_scatter import scatter_sum
 from ogb.graphproppred.mol_encoder import BondEncoder, AtomEncoder
-from data_handler import dataset_type
-from objects1 import TransferData1
-from ptensors1 import transfer0_1
+from training_pipeline.data_handler import dataset_type
+from ptensors.objects1 import TransferData1
+from ptensors.ptensors1 import transfer0_1
 
 class DummyNodeEncoder(Module):
     r"""

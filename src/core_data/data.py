@@ -6,8 +6,8 @@ import typing
 from torch import Tensor
 import torch
 from torch_geometric.data import Data
-from objects1 import atomspack1, TransferData0, TransferData1
-from objects2 import atomspack2, TransferData2
+from ptensors.objects1 import atomspack1, TransferData0, TransferData1
+from ptensors.objects2 import atomspack2, TransferData2
 supported_types = Union[atomspack1,atomspack2,TransferData0,TransferData1,TransferData2]
 _prefixes = {
   'ap1',

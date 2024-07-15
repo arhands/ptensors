@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Literal
-from data import FancyDataObject, PtensObjects
+from core_data.data import FancyDataObject, PtensObjects
 # from torch_geometric.utils import segment 
 from torch_scatter import scatter
 # from torch.nn import Linear, BatchNorm1d, ReLU, Module
@@ -11,13 +11,13 @@ from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Parameter, M
 # from torch.nn import Module, Sequential, ReLU, BatchNorm1d, Linear, Dropout, Parameter, Embedding, EmbeddingBag, ModuleList
 from torch import Tensor
 # from torch_scatter import scatter_sum
-from objects1 import TransferData1, atomspack1
-from ptensors1 import linmaps1_0, linmaps1_1, transfer0_1, transfer1_0, transfer1_1
-from ptensors0 import transfer0_0
+from ptensors.objects1 import TransferData1, atomspack1
+from ptensors.ptensors1 import linmaps1_0, linmaps1_1, transfer0_1, transfer1_0, transfer1_1
+from ptensors.ptensors0 import transfer0_0
 from torch.nn import functional as F
 
 from feature_encoders import CycleEmbedding
-from objects1 import TransferData0, TransferData1
+from ptensors.objects1 import TransferData0, TransferData1
 from torch_geometric.data import InMemoryDataset
 from argparse import Namespace
 from feature_encoders import get_edge_encoder, get_node_encoder

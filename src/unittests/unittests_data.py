@@ -7,8 +7,8 @@ from objects2 import TransferData2, atomspack2
 from torch_geometric.utils import segment
 from torch_geometric.data import Data, Batch
 from data import FancyDataObject
-from ptensors2 import transfer2_2_minimal, linmaps0_2, linmaps2_0
-from ptensors1 import linmaps0_1, linmaps1_0, transfer1_1
+from ptensors.ptensors2 import transfer2_2_minimal, linmaps0_2, linmaps2_0
+from ptensors.ptensors1 import linmaps0_1, linmaps1_0, transfer1_1
 from data_transforms import GeneratePtensObject, AddNodes, AddEdges, AddChordlessCycles, AddTransferMap, PtensObjects
 
 class batching(TestCase):

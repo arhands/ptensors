@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import torch
-from objects1 import atomspack1
+from ptensors.objects1 import atomspack1
 # linmaps
 class atomspack(TestCase):
     def test_overlapping_simple(self):

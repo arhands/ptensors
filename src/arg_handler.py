@@ -1,6 +1,6 @@
 from argparse import ArgumentParser, Namespace
-from model_handler import lr_scheduler_arg_type_list, loss_arg_type_list, score_arg_type_list, tu_dataset_type_list
-from data_handler import dataset_type_list
+from training_pipeline.model_handler import lr_scheduler_arg_type_list, loss_arg_type_list, score_arg_type_list, tu_dataset_type_list
+from training_pipeline.data_handler import dataset_type_list
 
 def get_args() -> Namespace:
   parser = ArgumentParser()

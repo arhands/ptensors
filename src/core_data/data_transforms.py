@@ -5,9 +5,9 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_networkx, degree
 from torch import Tensor
-from data import FancyDataObject, PtensObjects
-from objects1 import atomspack1, TransferData0, TransferData1
-from objects2 import atomspack2, TransferData2
+from core_data.data import FancyDataObject, PtensObjects
+from ptensors.objects1 import atomspack1, TransferData0, TransferData1
+from ptensors.objects2 import atomspack2, TransferData2
 import networkx as nx
 
 class GeneratePtensObject(BaseTransform):
