@@ -36,7 +36,7 @@ Please cite as:
   series = 	 {Proceedings of Machine Learning Research},
   month = 	 {02--04 May},
   publisher =    {PMLR},
-  pdf = 	 {https://proceedings.mlr.press/v238/r-hands24a/r-hands24a.pdf},
-  url = 	 {https://proceedings.mlr.press/v238/r-hands24a.html}
+  pdf = 	 {https://proceedings.mlr.press/v238/hands24a/hands24a.pdf},
+  url = 	 {https://proceedings.mlr.press/v238/hands24a.html}
 }
 ```
